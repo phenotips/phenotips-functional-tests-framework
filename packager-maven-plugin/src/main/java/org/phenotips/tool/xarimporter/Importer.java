@@ -43,10 +43,6 @@ public class Importer
     /**
      * Import documents defined in an XML file located in the passed document definition directory into a database
      * defined by its passed name and by an Hibernate configuration file.
-     * <p>
-     * Note: I would have liked to call this method "import" but it's a reserved keyword... Strange that it's not
-     * allowed for method names though.
-     * </p>
      *
      * @param sourceDirectory the directory where the package.xml file is located and where the documents to import are
      *            located
@@ -64,10 +60,6 @@ public class Importer
     /**
      * Import documents defined in an XML file located in the passed document definition directory into a database
      * defined by its passed name and by an Hibernate configuration file.
-     * <p>
-     * Note: I would have liked to call this method "import" but it's a reserved keyword... Strange that it's not
-     * allowed for method names though.
-     * </p>
      *
      * @param sourceDirectory the directory where the package.xml file is located and where the documents to import are
      *            located
@@ -87,8 +79,6 @@ public class Importer
         Package pack = new Package();
         pack.setWithVersions(false);
 
-        // TODO: The readFromDir method should not throw IOExceptions, only PackageException.
-        // See http://jira.xwiki.org/jira/browse/XWIKI-458
         try {
             pack.readFromDir(sourceDirectory, xcontext);
         } catch (IOException e) {
