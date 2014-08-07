@@ -20,6 +20,7 @@
 package org.phenotips.tool.packager;
 
 import org.phenotips.tool.xarimporter.Importer;
+import org.phenotips.tool.xarimporter.XContextFactory;
 
 import org.xwiki.velocity.internal.log.SLF4JLogChute;
 
@@ -379,7 +380,7 @@ public class PackageMojo extends AbstractMojo
 
             XWikiContext xcontext;
             try {
-                xcontext = importer.createXWikiContext("xwiki", new File(webInfDirectory, "hibernate.cfg.xml"));
+                xcontext = XContextFactory.createXWikiContext("xwiki", new File(webInfDirectory, "hibernate.cfg.xml"));
             } catch (Exception e) {
                 throw new MojoExecutionException("Failed to create context to import XAR files", e);
             }
@@ -397,23 +398,12 @@ public class PackageMojo extends AbstractMojo
                 }
             }
 
-            // We MUST shutdown HSQLDB because otherwise the last transactions will not be flushed
-            // to disk and will be lost. In practice this means the last Document imported has a
-            // very high chance of not making it...
-            // TODO: Find a way to implement this generically for all databases and inside
-            // XWikiHibernateStore (cf http://jira.xwiki.org/jira/browse/XWIKI-471).
-            try {
-                importer.shutdownHSQLDB(xcontext);
-            } catch (Exception e) {
-                throw new MojoExecutionException("Failed to shutdown hsqldb database", e);
-            }
-
             // Copy database files to XWiki's data directory.
             File dataDir = new File(this.outputPackageDirectory, "data");
             copyDirectory(this.databaseDirectory, new File(dataDir, "database"));
 
             try {
-                importer.disposeXWikiContext(xcontext);
+                XContextFactory.disposeXWikiContext(xcontext);
             } catch (Exception e) {
                 throw new MojoExecutionException("Failed to dispose XWiki context", e);
             }

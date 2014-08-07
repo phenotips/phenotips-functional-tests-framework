@@ -147,7 +147,7 @@ public class ImportMojo extends AbstractMojo
      */
     private void importDependencies(Importer importer, String databaseName, File hibernateConfig) throws Exception
     {
-        XWikiContext xcontext = importer.createXWikiContext(databaseName, hibernateConfig);
+        XWikiContext xcontext = XContextFactory.createXWikiContext(databaseName, hibernateConfig);
 
         // Reverse artifact order to have dependencies first (despite the fact that it's a Set it's actually an ordered
         // LinkedHashSet behind the scene)
@@ -170,14 +170,7 @@ public class ImportMojo extends AbstractMojo
             }
         }
 
-        // We MUST shutdown HSQLDB because otherwise the last transactions will not be flushed
-        // to disk and will be lost. In practice this means the last Document imported has a
-        // very high chance of not making it...
-        // TODO: Find a way to implement this generically for all databases and inside
-        // XWikiHibernateStore (cf http://jira.xwiki.org/jira/browse/XWIKI-471).
-        importer.shutdownHSQLDB(xcontext);
-
-        importer.disposeXWikiContext(xcontext);
+        XContextFactory.disposeXWikiContext(xcontext);
     }
 
     private void installExtension(Artifact artifact, XWikiContext xcontext) throws ComponentLookupException,

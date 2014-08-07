@@ -24,33 +24,21 @@ import org.xwiki.model.reference.DocumentReference;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.sql.Statement;
 
 import org.apache.commons.io.IOUtils;
-import org.hibernate.HibernateException;
-import org.hibernate.Session;
-import org.hibernate.dialect.Dialect;
-import org.hibernate.dialect.HSQLDialect;
-import org.hibernate.jdbc.Work;
 
 import com.xpn.xwiki.XWikiContext;
 import com.xpn.xwiki.XWikiException;
 import com.xpn.xwiki.plugin.packaging.DocumentInfo;
 import com.xpn.xwiki.plugin.packaging.Package;
 import com.xpn.xwiki.plugin.packaging.PackageException;
-import com.xpn.xwiki.store.XWikiCacheStore;
-import com.xpn.xwiki.store.XWikiHibernateBaseStore.HibernateCallback;
-import com.xpn.xwiki.store.XWikiHibernateStore;
-import com.xpn.xwiki.store.XWikiStoreInterface;
 
 /**
  * Import a set of XWiki documents into an existing database.
  *
  * @version $Id$
  */
-public class Importer extends AbstractPackager
+public class Importer
 {
     /**
      * Import documents defined in an XML file located in the passed document definition directory into a database
@@ -94,7 +82,7 @@ public class Importer extends AbstractPackager
     public void importDocuments(File sourceDirectory, String databaseName, File hibernateConfig, String importUser)
         throws Exception
     {
-        XWikiContext xcontext = createXWikiContext(databaseName, hibernateConfig);
+        XWikiContext xcontext = XContextFactory.createXWikiContext(databaseName, hibernateConfig);
 
         Package pack = new Package();
         pack.setWithVersions(false);
@@ -109,14 +97,7 @@ public class Importer extends AbstractPackager
         }
         installWithUser(importUser, pack, xcontext);
 
-        // We MUST shutdown HSQLDB because otherwise the last transactions will not be flushed
-        // to disk and will be lost. In practice this means the last Document imported has a
-        // very high chance of not making it...
-        // TODO: Find a way to implement this generically for all databases and inside
-        // XWikiHibernateStore (cf http://jira.xwiki.org/jira/browse/XWIKI-471).
-        shutdownHSQLDB(xcontext);
-
-        disposeXWikiContext(xcontext);
+        XContextFactory.disposeXWikiContext(xcontext);
     }
 
     /**
@@ -176,55 +157,6 @@ public class Importer extends AbstractPackager
         } finally {
             // Restore context user as before
             context.setUserReference(currentUserReference);
-        }
-    }
-
-    /**
-     * Shutdowns HSQLDB.
-     *
-     * @param context the XWiki Context object from which we can retrieve the Store implementation
-     * @throws XWikiException in case of shutdown error
-     */
-    public void shutdownHSQLDB(XWikiContext context) throws XWikiException
-    {
-        XWikiStoreInterface store = context.getWiki().getStore();
-        if (XWikiCacheStore.class.isAssignableFrom(store.getClass())) {
-            store = ((XWikiCacheStore) store).getStore();
-        }
-
-        if (XWikiHibernateStore.class.isAssignableFrom(store.getClass())) {
-            XWikiHibernateStore hibernateStore = (XWikiHibernateStore) store;
-
-            // check that is HSQLDB
-            Dialect dialect = Dialect.getDialect(hibernateStore.getConfiguration().getProperties());
-            if (!(dialect instanceof HSQLDialect)) {
-                return;
-            }
-
-            try {
-                hibernateStore.checkHibernate(context);
-                hibernateStore.executeRead(context, new HibernateCallback<Object>()
-                {
-                    @Override
-                    public Object doInHibernate(Session session) throws HibernateException, XWikiException
-                    {
-                        session.doWork(new Work()
-                        {
-                            @Override
-                            public void execute(Connection connection) throws SQLException
-                            {
-                                Statement stmt = connection.createStatement();
-                                stmt.execute("SHUTDOWN");
-                                System.out.println("SHUT DOWN THE DATABASE!");
-                            }
-                        });
-                        return null;
-                    }
-                });
-            } catch (Exception e) {
-                e.printStackTrace();
-                throw new PackageException(PackageException.ERROR_PACKAGE_UNKNOWN, "Failed to shutdown database", e);
-            }
         }
     }
 }
