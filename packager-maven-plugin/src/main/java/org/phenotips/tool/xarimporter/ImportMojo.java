@@ -253,7 +253,7 @@ public class ImportMojo extends AbstractMojo
         try {
             ProjectBuildingRequest request =
                 new DefaultProjectBuildingRequest().setRepositorySession(this.repositorySystemSession)
-                // We don't want to execute any plugin here
+                    // We don't want to execute any plugin here
                     .setProcessPlugins(false)
                     // It's not this plugin job to validate this pom.xml
                     .setValidationLevel(ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL);

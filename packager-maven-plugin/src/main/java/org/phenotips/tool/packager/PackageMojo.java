@@ -624,9 +624,9 @@ public class PackageMojo extends AbstractMojo
 
         ArtifactResolutionRequest request =
             new ArtifactResolutionRequest().setArtifact(this.project.getArtifact()).setArtifactDependencies(artifacts)
-            .setCollectionFilter(filter).setRemoteRepositories(this.remoteRepositories)
-            .setLocalRepository(this.localRepository).setManagedVersionMap(getManagedVersionMap())
-            .setResolveRoot(false);
+                .setCollectionFilter(filter).setRemoteRepositories(this.remoteRepositories)
+                .setLocalRepository(this.localRepository).setManagedVersionMap(getManagedVersionMap())
+                .setResolveRoot(false);
         ArtifactResolutionResult resolutionResult = this.repositorySystem.resolve(request);
         if (resolutionResult.hasExceptions()) {
             throw new MojoExecutionException(String.format("Failed to resolve artifacts [%s]", artifacts,
@@ -747,7 +747,7 @@ public class PackageMojo extends AbstractMojo
     {
         ArtifactResolutionRequest request =
             new ArtifactResolutionRequest().setArtifact(artifact).setRemoteRepositories(this.remoteRepositories)
-            .setLocalRepository(this.localRepository);
+                .setLocalRepository(this.localRepository);
         ArtifactResolutionResult resolutionResult = this.repositorySystem.resolve(request);
         if (resolutionResult.hasExceptions()) {
             throw new MojoExecutionException(String.format("Failed to resolve artifact [%s]", artifact,
