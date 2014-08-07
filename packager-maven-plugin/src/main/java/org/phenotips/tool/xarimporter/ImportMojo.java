@@ -53,6 +53,10 @@ import org.apache.maven.model.building.ModelBuildingRequest;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugins.annotations.Component;
+import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.DefaultProjectBuildingRequest;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.ProjectBuilder;
@@ -67,10 +71,11 @@ import com.xpn.xwiki.XWikiContext;
  * Maven 2 plugin to import aset of XWiki documents into an existing database.
  *
  * @version $Id$
- * @goal import
- * @requiresDependencyResolution compile
- * @requiresProject
  */
+@Mojo(
+    name = "import",
+    requiresProject = true,
+    requiresDependencyResolution = ResolutionScope.COMPILE)
 public class ImportMojo extends AbstractMojo
 {
     private static final String MPKEYPREFIX = "xwiki.extension.";
@@ -83,54 +88,32 @@ public class ImportMojo extends AbstractMojo
 
     private static final String MPNAME_FEATURES = "features";
 
-    /**
-     * @parameter default-value = "xwiki"
-     * @see org.phenotips.tool.xarimporter.Importer#importDocuments(java.io.File, String, java.io.File)
-     */
+    /** @see org.phenotips.tool.xarimporter.Importer#importDocuments(java.io.File, String, java.io.File) */
+    @Parameter(defaultValue = "xwiki")
     private String databaseName;
 
-    /**
-     * @parameter default-value = "${basedir}/src/main/packager/hibernate.cfg.xml"
-     * @see org.phenotips.tool.xarimporter.Importer#importDocuments(java.io.File, String, java.io.File)
-     */
+    /** @see org.phenotips.tool.xarimporter.Importer#importDocuments(java.io.File, String, java.io.File) */
+    @Parameter(defaultValue = "${basedir}/src/main/packager/hibernate.cfg.xml")
     private File hibernateConfig;
 
-    /**
-     * @parameter
-     * @see org.phenotips.tool.xarimporter.Importer#importDocuments(java.io.File, String, java.io.File)
-     */
+    /** @see org.phenotips.tool.xarimporter.Importer#importDocuments(java.io.File, String, java.io.File) */
+    @Parameter
     private File sourceDirectory;
 
-    /**
-     * @parameter default-value = "${project.build.directory}/data/"
-     * @see org.phenotips.tool.xarimporter.Importer#importDocuments(java.io.File, String, java.io.File)
-     */
+    /** @see org.phenotips.tool.xarimporter.Importer#importDocuments(java.io.File, String, java.io.File) */
+    @Parameter(defaultValue = "${project.build.directory}/data/")
     private File xwikiDataDir;
 
-    /**
-     * The maven project.
-     *
-     * @parameter expression="${project}"
-     * @required
-     * @readonly
-     */
+    /** The project being built. */
+    @Parameter(defaultValue = "${project}", required = true, readonly = true)
     private MavenProject project;
 
-    /**
-     * Project builder -- builds a model from a pom.xml.
-     *
-     * @component role="org.apache.maven.project.ProjectBuilder"
-     * @required
-     * @readonly
-     */
+    /** Builds a Model from a pom.xml. */
+    @Component
     private ProjectBuilder projectBuilder;
 
-    /**
-     * The current repository/network configuration of Maven.
-     *
-     * @parameter default-value="${repositorySystemSession}"
-     * @readonly
-     */
+    /** The current repository/network configuration of Maven. */
+    @Parameter(defaultValue = "${repositorySystemSession}", readonly = true)
     private RepositorySystemSession repositorySystemSession;
 
     @Override

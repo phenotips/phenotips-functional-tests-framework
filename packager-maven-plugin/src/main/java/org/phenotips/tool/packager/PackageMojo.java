@@ -58,6 +58,11 @@ import org.apache.maven.model.building.ModelBuildingRequest;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugins.annotations.Component;
+import org.apache.maven.plugins.annotations.LifecyclePhase;
+import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.DefaultProjectBuildingRequest;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.ProjectBuilder;
@@ -83,105 +88,64 @@ import com.xpn.xwiki.XWikiContext;
  *
  * @version $Id$
  * @since 1.0M1
- * @goal package
- * @phase package
- * @requiresProject
- * @requiresDependencyResolution runtime
- * @threadSafe
  */
+@Mojo(
+    name = "package",
+    defaultPhase = LifecyclePhase.PACKAGE,
+    requiresProject = true,
+    requiresDependencyResolution = ResolutionScope.RUNTIME,
+    threadSafe = true)
 public class PackageMojo extends AbstractMojo
 {
-    /**
-     * The directory where to create the packaging.
-     *
-     * @parameter default-value="${project.build.directory}/package"
-     * @required
-     */
+    /** The directory where to create the packaging. */
+    @Parameter(defaultValue = "${project.build.directory}/package")
     private File outputPackageDirectory;
 
-    /**
-     * The directory where classes are put.
-     *
-     * @parameter default-value="${project.build.outputDirectory}"
-     * @required
-     */
+    /** The directory where classes are put. */
+    @Parameter(defaultValue = "${project.build.outputDirectory}")
     private File outputClassesDirectory;
 
-    /**
-     * The directory where the HSQLDB database is generated.
-     *
-     * @parameter default-value="${project.build.directory}/database"
-     * @required
-     */
+    /** The directory where the HSQLDB database is generated. */
+    @Parameter(defaultValue = "${project.build.directory}/database")
     private File databaseDirectory;
 
-    /**
-     * The maven project.
-     *
-     * @parameter expression="${project}"
-     * @required
-     * @readonly
-     */
+    /** The project being built. */
+    @Parameter(defaultValue = "${project}", required = true, readonly = true)
     private MavenProject project;
 
-    /**
-     * Project builder -- builds a model from a pom.xml.
-     *
-     * @component role="org.apache.maven.project.ProjectBuilder"
-     * @required
-     * @readonly
-     */
+    /** Builds a Model from a pom.xml. */
+    @Component
     private ProjectBuilder projectBuilder;
 
-    /**
-     * Used to look up Artifacts in the remote repository.
-     *
-     * @component
-     */
+    /** Used to look up Artifacts in the remote repository. */
+    @Component
     private RepositorySystem repositorySystem;
 
-    /**
-     * The current repository/network configuration of Maven.
-     *
-     * @parameter default-value="${repositorySystemSession}"
-     * @readonly
-     */
+    /** The current repository/network configuration of Maven. */
+    @Parameter(defaultValue = "${repositorySystemSession}", readonly = true)
     private RepositorySystemSession repositorySystemSession;
 
-    /**
-     * Local repository to be used by the plugin to resolve dependencies.
-     *
-     * @parameter expression="${localRepository}"
-     */
+    /** Local repository to be used by the plugin to resolve dependencies. */
+    @Parameter(defaultValue = "${localRepository}")
     private ArtifactRepository localRepository;
 
-    /**
-     * List of remote repositories to be used by the plugin to resolve dependencies.
-     *
-     * @parameter expression="${project.remoteArtifactRepositories}"
-     */
+    /** List of remote repositories to be used by the plugin to resolve dependencies. */
+    @Parameter(defaultValue = "${project.remoteArtifactRepositories}")
     private List<ArtifactRepository> remoteRepositories;
 
     /**
      * The user under which the import should be done. If not user is specified then we import with backup pack. For
      * example {@code superadmin}.
-     *
-     * @parameter
      */
+    @Parameter
     private String importUser;
 
-    /**
-     * The version to be used for the needed XWiki modules.
-     *
-     * @parameter expression="${xwiki.version}" default-value="${xwiki.version}"
-     */
+    /** The version to be used for the needed XWiki modules. */
+    @Parameter(property = "xwiki.version")
     private String xwikiVersion;
 
-    /**
-     * List of skin artifacts to include in the packaging.
-     *
-     * @parameter
-     */
+    /** List of skin artifacts to include in the packaging. */
+    @Parameter
     private List<SkinArtifactItem> skinArtifactItems;
 
     /**
@@ -189,18 +153,15 @@ public class PackageMojo extends AbstractMojo
      * artifact is extracted. WARs that share the same context path are merged. The order of the WAR artifacts in the
      * dependency list is important because the last one can overwrite files from the previous ones if they share the
      * same context path.
-     *
-     * @parameter
      */
+    @Parameter
     private Map<String, String> contextPathMapping;
 
     /**
      * Indicate if the package mojo is used for tests. Among other things it means it's then possible to skip it using
      * skipTetsts system property.
-     *
-     * @parameter default-value="true"
-     * @since 6.0M2
      */
+    @Parameter(defaultValue = "true")
     private boolean test;
 
     @Override
