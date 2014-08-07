@@ -233,9 +233,9 @@
       <plugin>
         <artifactId>maven-plugin-plugin</artifactId>
         <configuration>
-          <!-- This to allow calling mvn packager:<mojo> from the command line. For example mvn packager:package
-               Without this users would need to call mvn xwiki-platform-tool-packager-plugin:package -->
-          <goalPrefix>packager</goalPrefix>
+          <!-- This to allow calling mvn phenotips-packager:<mojo> from the command line. For example mvn phenotips-packager:package
+               Without this users would need to call mvn phenotips-packager-maven-plugin:package -->
+          <goalPrefix>phenotips-packager</goalPrefix>
         </configuration>
       </plugin>
     </plugins>
