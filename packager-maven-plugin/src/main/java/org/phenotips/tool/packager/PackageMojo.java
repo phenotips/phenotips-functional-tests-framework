@@ -170,47 +170,30 @@ public class PackageMojo extends AbstractMojo
     {
         if (isSkipExecution()) {
             getLog().info("Skipping execution");
-
             return;
         }
+
+        File webappsDirectory = new File(this.outputPackageDirectory, "webapps");
+        File webappDirectory = new File(webappsDirectory, "phenotips");
+        File webInfDirectory = new File(webappDirectory, "WEB-INF");
+        File libDirectory = new File(webInfDirectory, "lib");
 
         getLog().info("Using platform version: " + this.xwikiVersion);
 
         // Step 1: Expand Jetty resources into the package output directory.
-        getLog().info("Expanding Jetty Resources ...");
         expandJettyDistribution();
 
         // Step 2: Get the WAR dependencies and expand them in the package output directory.
-        getLog().info("Expanding WAR dependencies ...");
-        File webappsDirectory = new File(this.outputPackageDirectory, "webapps");
-        for (Artifact warArtifact : resolveWarArtifacts()) {
-            getLog().info("  ... Unzipping WAR: " + warArtifact.getFile());
-            unzip(warArtifact.getFile(), new File(webappsDirectory, getContextPath(warArtifact)));
-        }
+        expandWebapps(webappsDirectory);
 
         // Step 3: Copy all JARs dependencies to the expanded WAR directory in WEB-INF/lib
-        getLog().info("Copying JAR dependencies ...");
-        File webappDirectory = new File(webappsDirectory, "phenotips");
-        File webInfDirectory = new File(webappDirectory, "WEB-INF");
-        File libDirectory = new File(webInfDirectory, "lib");
-        createDirectory(libDirectory);
-        for (Artifact artifact : resolveJarArtifacts()) {
-            getLog().info("  ... Copying JAR: " + artifact.getFile());
-            copyFile(artifact.getFile(), libDirectory);
-        }
+        copyLibs(webInfDirectory);
 
         // Step 4: Copy compiled classes in the WEB-INF/classes directory. This allows the tests to provide custom
-        // code, for example to override existing components for the test purpose. As an example the link
-        // checker might want to override the HTTP Checker component so that checks are not done over the
-        // internet since the tests need to execute in a stable environment to prevent false positives.
-        getLog().info("Copying Java Classes ...");
-        File classesDirectory = new File(webInfDirectory, "classes");
-        if (this.outputClassesDirectory.exists()) {
-            copyDirectory(this.outputClassesDirectory, classesDirectory);
-        }
+        // code, for example to override existing components for the test purpose.
+        copyClasses(webInfDirectory);
 
         // Step 5: Generate and copy config files.
-        getLog().info("Copying Configuration files ...");
         generateConfigurationFiles(webInfDirectory);
 
         // Step 6: Copy HSQLDB JDBC Driver
@@ -219,31 +202,9 @@ public class PackageMojo extends AbstractMojo
         copyFile(hsqldbArtifact.getFile(), libDirectory);
 
         // Step 7: Unzip the specified Skins. If no skin is specified then unzip the Colibri skin only.
-        getLog().info("Copying Skins ...");
-        File skinsDirectory = new File(webappDirectory, "skins");
-        if (this.skinArtifactItems != null) {
-            for (SkinArtifactItem skinArtifactItem : this.skinArtifactItems) {
-                Artifact skinArtifact = resolveArtifactItem(skinArtifactItem);
-                unzip(skinArtifact.getFile(), skinsDirectory);
-            }
-        } else {
-            Artifact colibriArtifact =
-                resolveArtifact("org.xwiki.platform", "xwiki-platform-colibri", this.xwikiVersion, "zip");
-            unzip(colibriArtifact.getFile(), skinsDirectory);
-        }
+        expandSkins(webappDirectory);
 
-        Artifact jettyResources = resolveArtifact("org.phenotips", "jetty-resources", this.project.getVersion(), "zip");
-        File smartGWTOutputDirectory = new File(this.project.getBuild().getDirectory(), "phenotips");
-        unzip(jettyResources.getFile(), smartGWTOutputDirectory);
-        File smartClientDirectory = new File(webappDirectory, "resources/js/smartclient");
-        copyDirectory(new File(smartGWTOutputDirectory, "com/smartclient/public/sc"), smartClientDirectory);
-        copyDirectory(new File(smartGWTOutputDirectory, "com/smartclient/theme/enterprise/public/sc/skins"), new File(
-            smartClientDirectory, "skins"));
-
-        // Step 9: Import specified XAR files into the database
-        getLog().info(
-            String.format("Import XAR dependencies %s...", this.importUser == null ? "as a backup pack"
-                : "using user [" + this.importUser + "]"));
+        // Step 8: Import specified XAR files into the database
         importXARs(webInfDirectory);
     }
 
@@ -264,6 +225,7 @@ public class PackageMojo extends AbstractMojo
 
     private void expandJettyDistribution() throws MojoExecutionException
     {
+        getLog().info("Expanding Jetty Resources ...");
         Artifact jettyArtifact = resolveJettyArtifact();
         unzip(jettyArtifact.getFile(), this.outputPackageDirectory);
 
@@ -288,6 +250,50 @@ public class PackageMojo extends AbstractMojo
                 throw new MojoExecutionException(String.format("Failed to process start shell script [%s]", startFile),
                     e);
             }
+        }
+    }
+
+    private void expandWebapps(File webappsDirectory) throws MojoExecutionException
+    {
+        getLog().info("Expanding WAR dependencies ...");
+        for (Artifact warArtifact : resolveWarArtifacts()) {
+            getLog().info("  ... Unzipping WAR: " + warArtifact.getFile());
+            unzip(warArtifact.getFile(), new File(webappsDirectory, getContextPath(warArtifact)));
+        }
+    }
+
+    private void copyLibs(File libDirectory) throws MojoExecutionException
+    {
+        getLog().info("Copying JAR dependencies ...");
+        createDirectory(libDirectory);
+        for (Artifact artifact : resolveJarArtifacts()) {
+            getLog().info("  ... Copying JAR: " + artifact.getFile());
+            copyFile(artifact.getFile(), libDirectory);
+        }
+    }
+
+    private void copyClasses(File webInfDirectory) throws MojoExecutionException
+    {
+        getLog().info("Copying Java Classes ...");
+        File classesDirectory = new File(webInfDirectory, "classes");
+        if (this.outputClassesDirectory.exists()) {
+            copyDirectory(this.outputClassesDirectory, classesDirectory);
+        }
+    }
+
+    private void expandSkins(File webappDirectory) throws MojoExecutionException
+    {
+        getLog().info("Copying Skins ...");
+        File skinsDirectory = new File(webappDirectory, "skins");
+        if (this.skinArtifactItems != null) {
+            for (SkinArtifactItem skinArtifactItem : this.skinArtifactItems) {
+                Artifact skinArtifact = resolveArtifactItem(skinArtifactItem);
+                unzip(skinArtifact.getFile(), skinsDirectory);
+            }
+        } else {
+            Artifact colibriArtifact =
+                resolveArtifact("org.xwiki.platform", "xwiki-platform-colibri", this.xwikiVersion, "zip");
+            unzip(colibriArtifact.getFile(), skinsDirectory);
         }
     }
 
@@ -330,6 +336,7 @@ public class PackageMojo extends AbstractMojo
 
     private void generateConfigurationFiles(File configurationFileTargetDirectory) throws MojoExecutionException
     {
+        getLog().info("Copying Configuration files ...");
         VelocityContext context = createVelocityContext();
         Artifact configurationResourcesArtifact =
             this.repositorySystem.createArtifact("org.xwiki.platform", "xwiki-platform-tool-configuration-resources",
@@ -369,6 +376,9 @@ public class PackageMojo extends AbstractMojo
 
     private void importXARs(File webInfDirectory) throws MojoExecutionException
     {
+        getLog().info(
+            String.format("Import XAR dependencies %s...", this.importUser == null ? "as a backup pack"
+                : "using user [" + this.importUser + "]"));
         Set<Artifact> xarArtifacts = resolveXARs();
         if (!xarArtifacts.isEmpty()) {
             Importer importer = new Importer();
