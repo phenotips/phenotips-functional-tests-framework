@@ -214,7 +214,8 @@ public class ImportMojo extends AbstractMojo
                 try {
                     authorURL = new URL(developer.getUrl());
                 } catch (MalformedURLException e) {
-                    // TODO: log ?
+                    this.getLog().warn(
+                        "Invalid URL for developer [" + developer.getId() + "]: [" + developer.getUrl() + "]");
                 }
             }
 
@@ -223,11 +224,9 @@ public class ImportMojo extends AbstractMojo
         }
 
         // licenses
-        if (!model.getLicenses().isEmpty()) {
-            ExtensionLicenseManager licenseManager = componentManager.getInstance(ExtensionLicenseManager.class);
-            for (License license : model.getLicenses()) {
-                extension.addLicense(getExtensionLicense(license, licenseManager));
-            }
+        ExtensionLicenseManager licenseManager = componentManager.getInstance(ExtensionLicenseManager.class);
+        for (License license : model.getLicenses()) {
+            extension.addLicense(getExtensionLicense(license, licenseManager));
         }
 
         // features

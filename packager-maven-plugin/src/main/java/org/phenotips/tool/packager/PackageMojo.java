@@ -33,7 +33,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -98,6 +97,20 @@ import com.xpn.xwiki.XWikiContext;
     threadSafe = true)
 public class PackageMojo extends AbstractMojo
 {
+    private static final String PHENOTIPS_GROUPID = "org.phenotips";
+
+    private static final String XWIKI_PLATFORM_GROUPID = "org.xwiki.platform";
+
+    private static final String TYPE_JAR = "jar";
+
+    private static final String TYPE_XAR = "xar";
+
+    private static final String TYPE_ZIP = "zip";
+
+    private static final String TYPE_WAR = "war";
+
+    private static final String CONTEXT_PATH = "phenotips";
+
     /** The directory where to create the packaging. */
     @Parameter(defaultValue = "${project.build.directory}/package")
     private File outputPackageDirectory;
@@ -141,6 +154,14 @@ public class PackageMojo extends AbstractMojo
     @Parameter
     private String importUser;
 
+    /** The default skin to configure for the platform. This may be overridden in the instance preferences. */
+    @Parameter(property = "xwiki.defaultSkin", defaultValue = "colibri")
+    private String defaultSkin;
+
+    /** The directory name where the data should be placed. */
+    @Parameter(property = "xwiki.dataDirectory", defaultValue = "${project.build.directory}/package/data/")
+    private File dataDirectory;
+
     /** The version to be used for the needed XWiki modules. */
     @Parameter(property = "xwiki.version")
     private String xwikiVersion;
@@ -174,7 +195,7 @@ public class PackageMojo extends AbstractMojo
         }
 
         File webappsDirectory = new File(this.outputPackageDirectory, "webapps");
-        File webappDirectory = new File(webappsDirectory, "phenotips");
+        File webappDirectory = new File(webappsDirectory, CONTEXT_PATH);
         File webInfDirectory = new File(webappDirectory, "WEB-INF");
         File libDirectory = new File(webInfDirectory, "lib");
 
@@ -233,7 +254,7 @@ public class PackageMojo extends AbstractMojo
         VelocityContext context = createVelocityContext();
         Collection<File> startFiles =
             org.apache.commons.io.FileUtils.listFiles(this.outputPackageDirectory, new WildcardFileFilter(
-                "start.*"), null);
+                "start*"), null);
 
         // Note: Init is done once even if this method is called several times...
         Velocity.setProperty(RuntimeConstants.RUNTIME_LOG_LOGSYSTEM, new SLF4JLogChute());
@@ -258,7 +279,7 @@ public class PackageMojo extends AbstractMojo
         getLog().info("Expanding WAR dependencies ...");
         for (Artifact warArtifact : resolveWarArtifacts()) {
             getLog().info("  ... Unzipping WAR: " + warArtifact.getFile());
-            unzip(warArtifact.getFile(), new File(webappsDirectory, getContextPath(warArtifact)));
+            unzip(warArtifact.getFile(), new File(webappsDirectory, CONTEXT_PATH));
         }
     }
 
@@ -292,7 +313,7 @@ public class PackageMojo extends AbstractMojo
             }
         } else {
             Artifact colibriArtifact =
-                resolveArtifact("org.xwiki.platform", "xwiki-platform-colibri", this.xwikiVersion, "zip");
+                resolveArtifact(XWIKI_PLATFORM_GROUPID, "xwiki-platform-colibri", this.xwikiVersion, TYPE_ZIP);
             unzip(colibriArtifact.getFile(), skinsDirectory);
         }
     }
@@ -321,7 +342,7 @@ public class PackageMojo extends AbstractMojo
                 }
                 // Default to JAR
                 if (type == null) {
-                    type = "jar";
+                    type = TYPE_JAR;
                 }
             }
         }
@@ -336,38 +357,31 @@ public class PackageMojo extends AbstractMojo
 
     private void generateConfigurationFiles(File configurationFileTargetDirectory) throws MojoExecutionException
     {
+        String parsedExtension = ".vm";
         getLog().info("Copying Configuration files ...");
         VelocityContext context = createVelocityContext();
         Artifact configurationResourcesArtifact =
-            this.repositorySystem.createArtifact("org.xwiki.platform", "xwiki-platform-tool-configuration-resources",
-                this.xwikiVersion, "", "jar");
+            this.repositorySystem.createArtifact(XWIKI_PLATFORM_GROUPID, "xwiki-platform-tool-configuration-resources",
+                this.xwikiVersion, "", TYPE_JAR);
         resolveArtifact(configurationResourcesArtifact);
 
         configurationFileTargetDirectory.mkdirs();
 
-        try {
-            JarInputStream jarInputStream =
-                new JarInputStream(new FileInputStream(configurationResourcesArtifact.getFile()));
-
-            try {
-                JarEntry entry;
-                while ((entry = jarInputStream.getNextJarEntry()) != null) {
-                    if (entry.getName().endsWith(".vm")) {
-
-                        String fileName = entry.getName().replace(".vm", "");
-                        File outputFile = new File(configurationFileTargetDirectory, fileName);
-                        OutputStreamWriter writer = new OutputStreamWriter(new FileOutputStream(outputFile));
-                        getLog().info("Writing config file: " + outputFile);
-                        // Note: Init is done once even if this method is called several times...
-                        Velocity.init();
-                        Velocity.evaluate(context, writer, "", IOUtils.toString(jarInputStream));
-                        writer.close();
-                        jarInputStream.closeEntry();
-                    }
+        try (JarInputStream jarInputStream =
+                new JarInputStream(new FileInputStream(configurationResourcesArtifact.getFile()))) {
+            JarEntry entry;
+            while ((entry = jarInputStream.getNextJarEntry()) != null) {
+                if (entry.getName().endsWith(parsedExtension)) {
+                    String fileName = entry.getName().replace(parsedExtension, "");
+                    File outputFile = new File(configurationFileTargetDirectory, fileName);
+                    OutputStreamWriter writer = new OutputStreamWriter(new FileOutputStream(outputFile));
+                    getLog().info("Writing config file: " + outputFile);
+                    // Note: Init is done once even if this method is called several times...
+                    Velocity.init();
+                    Velocity.evaluate(context, writer, "", IOUtils.toString(jarInputStream));
+                    writer.close();
+                    jarInputStream.closeEntry();
                 }
-            } finally {
-                // Flush and close all the streams
-                jarInputStream.close();
             }
         } catch (Exception e) {
             throw new MojoExecutionException("Failed to extract configuration files", e);
@@ -409,7 +423,7 @@ public class PackageMojo extends AbstractMojo
             }
 
             // Copy database files to XWiki's data directory.
-            File dataDir = new File(this.outputPackageDirectory, "data");
+            File dataDir = this.dataDirectory;
             copyDirectory(this.databaseDirectory, new File(dataDir, "database"));
 
             try {
@@ -427,7 +441,7 @@ public class PackageMojo extends AbstractMojo
         Set<Artifact> artifacts = this.project.getArtifacts();
         if (artifacts != null) {
             for (Artifact artifact : artifacts) {
-                if (artifact.getType().equals("xar")) {
+                if (artifact.getType().equals(TYPE_XAR)) {
                     xarArtifacts.add(artifact);
                     resolveArtifact(artifact);
                 }
@@ -440,12 +454,14 @@ public class PackageMojo extends AbstractMojo
     private Artifact resolveHSQLDBArtifact() throws MojoExecutionException
     {
         Artifact hsqldbArtifact = null;
+        String groupId = "org.hsqldb";
+        String artifactId = "hsqldb";
 
         Set<Artifact> artifacts = this.project.getArtifacts();
         if (artifacts != null) {
             for (Artifact artifact : artifacts) {
-                if (artifact.getType().equals("jar") && artifact.getGroupId().equals("org.hsqldb")
-                    && artifact.getArtifactId().equals("hsqldb")) {
+                if (artifact.getType().equals(TYPE_JAR) && artifact.getGroupId().equals(groupId)
+                    && artifact.getArtifactId().equals(artifactId)) {
                     hsqldbArtifact = artifact;
                     break;
                 }
@@ -454,7 +470,7 @@ public class PackageMojo extends AbstractMojo
 
         // If the HSQLDB artifact wasn't defined, try to resolve the default HSQLDB JAR artifact
         if (hsqldbArtifact == null) {
-            hsqldbArtifact = this.repositorySystem.createArtifact("org.hsqldb", "hsqldb", "2.2.9", "", "jar");
+            hsqldbArtifact = this.repositorySystem.createArtifact(groupId, artifactId, "2.3.2", "", TYPE_JAR);
         }
 
         if (hsqldbArtifact != null) {
@@ -470,11 +486,12 @@ public class PackageMojo extends AbstractMojo
     private Artifact resolveJettyArtifact() throws MojoExecutionException
     {
         Artifact jettyArtifact = null;
+        String artifactId = "jetty-resources";
 
         Set<Artifact> artifacts = this.project.getArtifacts();
         if (artifacts != null) {
             for (Artifact artifact : artifacts) {
-                if (artifact.getType().equals("zip") && artifact.getArtifactId().equals("jetty-resources")) {
+                if (artifact.getType().equals(TYPE_ZIP) && artifact.getArtifactId().equals(artifactId)) {
                     jettyArtifact = artifact;
                     break;
                 }
@@ -483,8 +500,8 @@ public class PackageMojo extends AbstractMojo
 
         // If the Jetty artifact wasn't defined, try to resolve the default Jetty artifact
         if (jettyArtifact == null) {
-            jettyArtifact = this.repositorySystem.createArtifact("org.phenotips", "jetty-resources",
-                this.project.getVersion(), "", "zip");
+            jettyArtifact = this.repositorySystem.createArtifact(PHENOTIPS_GROUPID, artifactId,
+                this.project.getVersion(), "", TYPE_ZIP);
         }
 
         if (jettyArtifact != null) {
@@ -503,15 +520,15 @@ public class PackageMojo extends AbstractMojo
 
         // First look for dependencies of type WAR.
         for (Artifact artifact : this.project.getArtifacts()) {
-            if (artifact.getType().equals("war")) {
+            if (artifact.getType().equals(TYPE_WAR)) {
                 warArtifacts.add(artifact);
             }
         }
 
         // If there are no WAR artifacts specified in the list of dependencies then use the default WAR artifacts.
         if (warArtifacts.isEmpty()) {
-            warArtifacts.add(this.repositorySystem.createArtifact("org.xwiki.platform", "xwiki-platform-web",
-                this.xwikiVersion, "", "war"));
+            warArtifacts.add(this.repositorySystem.createArtifact(XWIKI_PLATFORM_GROUPID, "xwiki-platform-web",
+                this.xwikiVersion, "", TYPE_WAR));
         }
 
         for (Artifact warArtifact : warArtifacts) {
@@ -519,23 +536,6 @@ public class PackageMojo extends AbstractMojo
         }
 
         return warArtifacts;
-    }
-
-    private String getContextPath(Artifact warArtifact)
-    {
-        String contextPath = getContextPathMapping().get(warArtifact.getArtifactId());
-        if (contextPath == null) {
-            contextPath = "phenotips";
-        }
-        return contextPath;
-    }
-
-    private Map<String, String> getContextPathMapping()
-    {
-        if (this.contextPathMapping == null) {
-            this.contextPathMapping = Collections.emptyMap();
-        }
-        return this.contextPathMapping;
     }
 
     private Collection<Artifact> resolveJarArtifacts() throws MojoExecutionException
@@ -553,7 +553,7 @@ public class PackageMojo extends AbstractMojo
         Set<Artifact> jarArtifacts = new HashSet<Artifact>();
         for (Artifact artifact : resolvedArtifacts) {
             // Note: test-jar is used in functional tests from time to time and we need to package them too.
-            if (artifact.getType().equals("jar") || artifact.getType().equals("test-jar")) {
+            if (artifact.getType().equals(TYPE_JAR) || artifact.getType().equals("test-jar")) {
                 jarArtifacts.add(artifact);
             }
         }
@@ -565,48 +565,47 @@ public class PackageMojo extends AbstractMojo
     {
         Set<Artifact> mandatoryTopLevelArtifacts = new HashSet<Artifact>();
 
-        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact("org.xwiki.platform",
-            "xwiki-platform-oldcore", this.xwikiVersion, null, "jar"));
+        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact(XWIKI_PLATFORM_GROUPID,
+            "xwiki-platform-oldcore", this.xwikiVersion, null, TYPE_JAR));
 
         // Required Plugins
-        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact("org.xwiki.platform",
-            "xwiki-platform-skin-skinx", this.xwikiVersion, null, "jar"));
+        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact(XWIKI_PLATFORM_GROUPID,
+            "xwiki-platform-skin-skinx", this.xwikiVersion, null, TYPE_JAR));
 
         // We shouldn't need those but right now it's mandatory since they are defined in the default web.xml file we
         // provide. We'll be able to remove them when we start using Servlet 3.0 -->
-        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact("org.xwiki.platform",
-            "xwiki-platform-rest-server", this.xwikiVersion, null, "jar"));
+        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact(XWIKI_PLATFORM_GROUPID,
+            "xwiki-platform-rest-server", this.xwikiVersion, null, TYPE_JAR));
 
         // Needed by platform-web but since we don't have any dep in platform-web's pom.xml at the moment (duplication
         // issue with XE/XEM and platform-web) we need to include it here FTM... Solution: get a better maven WAR plugin
         // with proper merge feature and then remove this...
-        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact("org.xwiki.platform",
-            "xwiki-platform-uiextension-api", this.xwikiVersion, null, "jar"));
-        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact("org.xwiki.platform",
-            "xwiki-platform-localization-script", this.xwikiVersion, null, "jar"));
-        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact("org.xwiki.platform",
-            "xwiki-platform-localization-source-legacy", this.xwikiVersion, null, "jar"));
-        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact("org.xwiki.platform",
-            "xwiki-platform-security-bridge", this.xwikiVersion, null, "jar"));
-        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact("org.xwiki.platform",
-            "xwiki-platform-url-standard", this.xwikiVersion, null, "jar"));
-        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact("org.xwiki.platform",
-            "xwiki-platform-wiki-default", this.xwikiVersion, null, "jar"));
+        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact(XWIKI_PLATFORM_GROUPID,
+            "xwiki-platform-uiextension-api", this.xwikiVersion, null, TYPE_JAR));
+        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact(XWIKI_PLATFORM_GROUPID,
+            "xwiki-platform-localization-script", this.xwikiVersion, null, TYPE_JAR));
+        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact(XWIKI_PLATFORM_GROUPID,
+            "xwiki-platform-localization-source-legacy", this.xwikiVersion, null, TYPE_JAR));
+        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact(XWIKI_PLATFORM_GROUPID,
+            "xwiki-platform-security-bridge", this.xwikiVersion, null, TYPE_JAR));
+        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact(XWIKI_PLATFORM_GROUPID,
+            "xwiki-platform-url-standard", this.xwikiVersion, null, TYPE_JAR));
+        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact(XWIKI_PLATFORM_GROUPID,
+            "xwiki-platform-wiki-default", this.xwikiVersion, null, TYPE_JAR));
 
         // Ensures all logging goes through SLF4J and Logback.
         mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact("org.xwiki.commons",
-            "xwiki-commons-logging-logback", this.xwikiVersion, "compile", "jar"));
+            "xwiki-commons-logging-logback", this.xwikiVersion, "compile", TYPE_JAR));
         // Get the logging artifact versions from the top level XWiki Commons POM
-        MavenProject pomProject = getTopLevelPOMProject();
-        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact("org.slf4j", "jcl-over-slf4j",
-            getDependencyManagementVersion(pomProject, "org.slf4j", "jcl-over-slf4j"), null, "jar"));
-        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact("org.slf4j", "log4j-over-slf4j",
-            getDependencyManagementVersion(pomProject, "org.slf4j", "log4j-over-slf4j"), null, "jar"));
+
+        String slf4jGroupId = "org.slf4j";
+        mandatoryTopLevelArtifacts.add(this.resolveManagedArtifact(slf4jGroupId, "jcl-over-slf4j", TYPE_JAR));
+        mandatoryTopLevelArtifacts.add(this.resolveManagedArtifact(slf4jGroupId, "log4j-over-slf4j", TYPE_JAR));
 
         // When writing functional tests there's is often the need to export pages as XAR. Thus, in order to make
         // developer's life easy, we also include the filter module (used for XAR exports).
-        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact("org.xwiki.platform",
-            "xwiki-platform-filter-instance-oldcore", this.xwikiVersion, null, "jar"));
+        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact(XWIKI_PLATFORM_GROUPID,
+            "xwiki-platform-filter-instance-oldcore", this.xwikiVersion, null, TYPE_JAR));
 
         return mandatoryTopLevelArtifacts;
     }
@@ -654,14 +653,14 @@ public class PackageMojo extends AbstractMojo
 
     private MavenProject getTopLevelPOMProject() throws MojoExecutionException
     {
-        return getMavenProject(this.repositorySystem.createProjectArtifact("org.phenotips", "phenotips-parent",
+        return getMavenProject(this.repositorySystem.createProjectArtifact(PHENOTIPS_GROUPID, "phenotips-parent",
             this.project.getVersion()));
     }
 
     private MavenProject getPlatformPOMProject() throws MojoExecutionException
     {
-        return getMavenProject(this.repositorySystem.createProjectArtifact("org.xwiki.platform", "xwiki-platform-core",
-            this.xwikiVersion));
+        return getMavenProject(this.repositorySystem.createProjectArtifact(XWIKI_PLATFORM_GROUPID,
+            "xwiki-platform-core", this.xwikiVersion));
     }
 
     private MavenProject getMavenProject(Artifact artifact) throws MojoExecutionException
@@ -755,6 +754,13 @@ public class PackageMojo extends AbstractMojo
         }
     }
 
+    private Artifact resolveManagedArtifact(String groupId, String artifactId, String type)
+        throws MojoExecutionException
+    {
+        String version = getDependencyManagementVersion(getTopLevelPOMProject(), groupId, artifactId);
+        return resolveArtifact(groupId, artifactId, version, type);
+    }
+
     private Artifact resolveArtifact(String groupId, String artifactId, String version, String type)
         throws MojoExecutionException
     {
@@ -784,10 +790,9 @@ public class PackageMojo extends AbstractMojo
         context.put("presentYear", year);
 
         if (inceptionYear.equals(year)) {
-            context.put("projectTimespan", year);
-        } else {
-            context.put("projectTimespan", inceptionYear + "-" + year);
+            year = inceptionYear + "-" + year;
         }
+        context.put("projectTimespan", year);
 
         return context;
     }
@@ -814,12 +819,16 @@ public class PackageMojo extends AbstractMojo
             + "        com.xpn.xwiki.plugin.skinx.LinkExtensionPlugin");
         props.setProperty("xwikiCfgVirtualUsepath", "1");
         props.setProperty("xwikiCfgEditCommentMandatory", "0");
-        props.setProperty("xwikiCfgDefaultSkin", "colibri");
-        props.setProperty("xwikiCfgDefaultBaseSkin", "colibri");
+        props.setProperty("xwikiCfgDefaultSkin", this.defaultSkin);
+        props.setProperty("xwikiCfgDefaultBaseSkin", this.defaultSkin);
         props.setProperty("xwikiCfgEncoding", "UTF-8");
 
         // Other default configuration properties
-        props.setProperty("xwikiDataDir", "data");
+        try {
+            props.setProperty("xwikiDataDir", this.dataDirectory.getCanonicalPath());
+        } catch (IOException e) {
+            // Shouldn't happen
+        }
 
         return props;
     }
