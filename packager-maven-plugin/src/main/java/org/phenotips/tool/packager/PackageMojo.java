@@ -639,11 +639,11 @@ public class PackageMojo extends AbstractMojo
     {
         Map<String, Artifact> dependencyManagementMap = new HashMap<String, Artifact>();
 
-        // Add Platform Core's <dependencyManagement> since this is where we keep all our dependencies management
+        // Manually add the top level <dependencyManagement> since this is where we keep all our dependencies management
         // information. We absolutely need to include those because Maven 3.x's artifact seems to have a big hole in
         // not handling artifact's parent dependency management information by itself!
         // See http://jira.codehaus.org/browse/MNG-5462
-        dependencyManagementMap.putAll(getPlatformPOMProject().getManagedVersionMap());
+        dependencyManagementMap.putAll(getTopLevelPOMProject().getManagedVersionMap());
 
         // We add the project's dependency management in a second step so that it can override the platform dep mgmt map
         dependencyManagementMap.putAll(this.project.getManagedVersionMap());
@@ -655,12 +655,6 @@ public class PackageMojo extends AbstractMojo
     {
         return getMavenProject(this.repositorySystem.createProjectArtifact(PHENOTIPS_GROUPID, "phenotips-parent",
             this.project.getVersion()));
-    }
-
-    private MavenProject getPlatformPOMProject() throws MojoExecutionException
-    {
-        return getMavenProject(this.repositorySystem.createProjectArtifact(XWIKI_PLATFORM_GROUPID,
-            "xwiki-platform-core", this.xwikiVersion));
     }
 
     private MavenProject getMavenProject(Artifact artifact) throws MojoExecutionException
