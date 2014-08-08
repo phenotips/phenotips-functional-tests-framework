@@ -53,6 +53,7 @@ import org.apache.maven.artifact.resolver.ArtifactResolutionResult;
 import org.apache.maven.artifact.resolver.filter.AndArtifactFilter;
 import org.apache.maven.artifact.resolver.filter.ExcludesArtifactFilter;
 import org.apache.maven.artifact.resolver.filter.ScopeArtifactFilter;
+import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.building.ModelBuildingRequest;
 import org.apache.maven.plugin.AbstractMojo;
@@ -78,7 +79,6 @@ import org.codehaus.plexus.logging.Logger;
 import org.codehaus.plexus.logging.console.ConsoleLogger;
 import org.codehaus.plexus.util.FileUtils;
 import org.codehaus.plexus.util.StringUtils;
-import org.eclipse.aether.RepositorySystemSession;
 import org.hibernate.cfg.Environment;
 
 import com.xpn.xwiki.XWikiContext;
@@ -135,9 +135,9 @@ public class PackageMojo extends AbstractMojo
     @Component
     private RepositorySystem repositorySystem;
 
-    /** The current repository/network configuration of Maven. */
-    @Parameter(defaultValue = "${repositorySystemSession}", readonly = true)
-    private RepositorySystemSession repositorySystemSession;
+    /** The current Maven session being executed. */
+    @Component
+    private MavenSession session;
 
     /** Local repository to be used by the plugin to resolve dependencies. */
     @Parameter(defaultValue = "${localRepository}")
@@ -661,7 +661,7 @@ public class PackageMojo extends AbstractMojo
     {
         try {
             ProjectBuildingRequest request =
-                new DefaultProjectBuildingRequest().setRepositorySession(this.repositorySystemSession)
+                new DefaultProjectBuildingRequest(this.session.getProjectBuildingRequest())
                     // We don't want to execute any plugin here
                     .setProcessPlugins(false)
                     // It's not this plugin job to validate this pom.xml

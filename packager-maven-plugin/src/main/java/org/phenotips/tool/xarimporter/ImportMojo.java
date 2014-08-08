@@ -45,6 +45,7 @@ import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.artifact.Artifact;
+import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Developer;
 import org.apache.maven.model.License;
@@ -63,7 +64,6 @@ import org.apache.maven.project.ProjectBuilder;
 import org.apache.maven.project.ProjectBuildingException;
 import org.apache.maven.project.ProjectBuildingRequest;
 import org.apache.maven.project.ProjectBuildingResult;
-import org.eclipse.aether.RepositorySystemSession;
 
 import com.xpn.xwiki.XWikiContext;
 
@@ -112,9 +112,9 @@ public class ImportMojo extends AbstractMojo
     @Component
     private ProjectBuilder projectBuilder;
 
-    /** The current repository/network configuration of Maven. */
-    @Parameter(defaultValue = "${repositorySystemSession}", readonly = true)
-    private RepositorySystemSession repositorySystemSession;
+    /** The current Maven session being executed. */
+    @Component
+    private MavenSession session;
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException
@@ -251,7 +251,7 @@ public class ImportMojo extends AbstractMojo
     {
         try {
             ProjectBuildingRequest request =
-                new DefaultProjectBuildingRequest().setRepositorySession(this.repositorySystemSession)
+                new DefaultProjectBuildingRequest(this.session.getProjectBuildingRequest())
                     // We don't want to execute any plugin here
                     .setProcessPlugins(false)
                     // It's not this plugin job to validate this pom.xml
