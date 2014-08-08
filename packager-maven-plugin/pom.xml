@@ -71,13 +71,6 @@
     <!-- XWiki -->
     <dependency>
       <groupId>org.xwiki.platform</groupId>
-      <artifactId>xwiki-platform-web</artifactId>
-      <version>${xwiki.version}</version>
-      <type>war</type>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.xwiki.platform</groupId>
       <artifactId>xwiki-platform-oldcore</artifactId>
       <version>${xwiki.version}</version>
       <exclusions>
@@ -107,12 +100,6 @@
       <version>${xwiki.version}</version>
       <scope>runtime</scope>
     </dependency>
-    <!-- The new version of HTMLCleaner is required for PDFs to work properly -->
-    <dependency>
-      <groupId>net.sourceforge.htmlcleaner</groupId>
-      <artifactId>htmlcleaner</artifactId>
-      <version>2.8</version>
-    </dependency>
     <!-- Components Modules -->
     <dependency>
       <groupId>org.xwiki.commons</groupId>
@@ -120,35 +107,15 @@
       <version>${xwiki.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.xwiki.platform</groupId>
-      <artifactId>xwiki-platform-component-script</artifactId>
-      <version>${xwiki.version}</version>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
       <groupId>org.xwiki.commons</groupId>
       <artifactId>xwiki-commons-environment-standard</artifactId>
       <version>${xwiki.version}</version>
-    </dependency>
-    <!-- REST module -->
-    <dependency>
-      <groupId>org.xwiki.platform</groupId>
-      <artifactId>xwiki-platform-rest-server</artifactId>
-      <version>${xwiki.version}</version>
-      <scope>runtime</scope>
     </dependency>
     <!-- ClassLoader -->
     <dependency>
       <groupId>org.xwiki.platform</groupId>
       <artifactId>xwiki-platform-classloader-xwiki</artifactId>
       <version>${xwiki.version}</version>
-      <scope>runtime</scope>
-    </dependency>
-     <dependency>
-      <groupId>org.xwiki.platform</groupId>
-      <artifactId>xwiki-platform-colibri</artifactId>
-      <version>${xwiki.version}</version>
-      <type>zip</type>
       <scope>runtime</scope>
     </dependency>
     <!-- URL -->
@@ -219,13 +186,6 @@
       <groupId>org.xwiki.platform</groupId>
       <artifactId>xwiki-platform-tool-configuration-resources</artifactId>
       <version>${xwiki.version}</version>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.phenotips</groupId>
-      <artifactId>jetty-resources</artifactId>
-      <version>${phenotips.version}</version>
-      <type>zip</type>
       <scope>runtime</scope>
     </dependency>
   </dependencies>
