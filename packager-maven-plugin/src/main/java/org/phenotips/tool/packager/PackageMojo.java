@@ -527,8 +527,8 @@ public class PackageMojo extends AbstractMojo
 
         // If there are no WAR artifacts specified in the list of dependencies then use the default WAR artifacts.
         if (warArtifacts.isEmpty()) {
-            warArtifacts.add(this.repositorySystem.createArtifact(XWIKI_PLATFORM_GROUPID, "xwiki-platform-web",
-                this.xwikiVersion, "", TYPE_WAR));
+            warArtifacts.add(this.repositorySystem.createArtifact(PHENOTIPS_GROUPID, "phenotips-base-war",
+                this.project.getVersion(), "", TYPE_WAR));
         }
 
         for (Artifact warArtifact : warArtifacts) {
