@@ -33,6 +33,8 @@
   <description>A Maven plugin that packages a minimal PhenoTips distribution, containing Jetty and the base PhenoTips war, along with the specific dependencies needed for testing a module.</description>
   <properties>
     <mavenVersion>3.0.5</mavenVersion>
+    <!-- Writing Maven plugins requires a lot of dependencies, disable ClassFanOutComplexity checks -->
+    <checkstyle.suppressions.location>${basedir}/src/checkstyle/checkstyle-suppressions.xml</checkstyle.suppressions.location>
   </properties>
   <dependencies>
     <!-- Maven -->
