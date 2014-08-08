@@ -63,7 +63,7 @@ import org.apache.maven.project.ProjectBuilder;
 import org.apache.maven.project.ProjectBuildingException;
 import org.apache.maven.project.ProjectBuildingRequest;
 import org.apache.maven.project.ProjectBuildingResult;
-import org.sonatype.aether.RepositorySystemSession;
+import org.eclipse.aether.RepositorySystemSession;
 
 import com.xpn.xwiki.XWikiContext;
 

@@ -78,8 +78,8 @@ import org.codehaus.plexus.logging.Logger;
 import org.codehaus.plexus.logging.console.ConsoleLogger;
 import org.codehaus.plexus.util.FileUtils;
 import org.codehaus.plexus.util.StringUtils;
+import org.eclipse.aether.RepositorySystemSession;
 import org.hibernate.cfg.Environment;
-import org.sonatype.aether.RepositorySystemSession;
 
 import com.xpn.xwiki.XWikiContext;
 
