@@ -61,7 +61,9 @@ public final class MavenUtils
                     // We don't want to execute any plugin here
                     .setProcessPlugins(false)
                     // It's not this plugin job to validate this pom.xml
-                    .setValidationLevel(ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL);
+                    .setValidationLevel(ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL)
+                    // Use the repositories configured for the built project instead of the global Maven ones
+                    .setRemoteRepositories(session.getCurrentProject().getRemoteArtifactRepositories());
             // Note: build() will automatically get the POM artifact corresponding to the passed artifact.
             ProjectBuildingResult result = projectBuilder.build(artifact, request);
             return result.getProject();
