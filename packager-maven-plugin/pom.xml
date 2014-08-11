@@ -98,12 +98,6 @@
         </exclusion>
       </exclusions>
     </dependency>
-    <dependency>
-      <groupId>org.xwiki.platform</groupId>
-      <artifactId>xwiki-platform-skin-skinx</artifactId>
-      <version>${xwiki.version}</version>
-      <scope>runtime</scope>
-    </dependency>
     <!-- Components Modules -->
     <dependency>
       <groupId>org.xwiki.commons</groupId>
@@ -154,12 +148,14 @@
       <version>${slf4j.version}</version>
       <scope>runtime</scope>
     </dependency>
+    <!-- Database engine -->
     <dependency>
       <groupId>org.hsqldb</groupId>
       <artifactId>hsqldb</artifactId>
       <version>2.3.2</version>
       <scope>runtime</scope>
     </dependency>
+    <!-- Needed at runtime -->
     <dependency>
       <groupId>org.xwiki.platform</groupId>
       <artifactId>xwiki-platform-security-bridge</artifactId>
@@ -171,12 +167,6 @@
       <groupId>antlr</groupId>
       <artifactId>antlr</artifactId>
       <version>2.7.6</version>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.xwiki.platform</groupId>
-      <artifactId>xwiki-platform-container-servlet</artifactId>
-      <version>${xwiki.version}</version>
       <scope>runtime</scope>
     </dependency>
     <!-- We need the Servlet API dep since it's used by the Packager and since it has
