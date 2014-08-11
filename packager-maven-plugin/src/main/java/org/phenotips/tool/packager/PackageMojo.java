@@ -19,6 +19,7 @@
  */
 package org.phenotips.tool.packager;
 
+import org.phenotips.tool.utils.LogUtils;
 import org.phenotips.tool.utils.MavenUtils;
 import org.phenotips.tool.utils.XContextFactory;
 import org.phenotips.tool.xarimporter.Importer;
@@ -186,6 +187,7 @@ public class PackageMojo extends AbstractMojo
             return;
         }
 
+        LogUtils.configureXWikiLogs();
         File webappsDirectory = new File(this.outputPackageDirectory, "webapps");
         File webappDirectory = new File(webappsDirectory, CONTEXT_PATH);
         File webInfDirectory = new File(webappDirectory, "WEB-INF");

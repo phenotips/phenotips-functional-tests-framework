@@ -19,6 +19,7 @@
  */
 package org.phenotips.tool.xarimporter;
 
+import org.phenotips.tool.utils.LogUtils;
 import org.phenotips.tool.utils.MavenUtils;
 import org.phenotips.tool.utils.XContextFactory;
 
@@ -117,6 +118,7 @@ public class ImportMojo extends AbstractMojo
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException
     {
+        LogUtils.configureXWikiLogs();
         Importer importer = new Importer();
 
         System.setProperty("xwiki.data.dir", this.xwikiDataDir.getAbsolutePath());
