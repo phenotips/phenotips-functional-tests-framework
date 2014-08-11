@@ -27,6 +27,12 @@ package org.phenotips.tool.utils;
  */
 public final class LogUtils
 {
+    private static final String DEBUG_LEVEL = "debug";
+
+    private static final String WARN_LEVEL = "warn";
+
+    private static final String ERROR_LEVEL = "error";
+
     private LogUtils()
     {
         // Forbid instantiation of utility class
@@ -45,12 +51,12 @@ public final class LogUtils
         }
         String logLevel;
         switch (rootLogLevel) {
-            case "debug":
-            case "error":
+            case DEBUG_LEVEL:
+            case ERROR_LEVEL:
                 logLevel = rootLogLevel;
                 break;
             default:
-                logLevel = "warn";
+                logLevel = WARN_LEVEL;
         }
         System.setProperty("org.slf4j.simpleLogger.log.com.xpn", logLevel);
         System.setProperty("org.slf4j.simpleLogger.log.org.xwiki", logLevel);
@@ -59,5 +65,8 @@ public final class LogUtils
         System.setProperty("org.slf4j.simpleLogger.log.org.reflections", logLevel);
         System.setProperty("org.slf4j.simpleLogger.log.org.hsqldb", logLevel);
         System.setProperty("org.slf4j.simpleLogger.log.hsqldb.db", logLevel);
+        // Explicitly ignore warnings about the logback system, since under Maven 3.1+ the logging framework used is
+        // slf4j-simple
+        System.setProperty("org.slf4j.simpleLogger.log.org.xwiki.logging.logback", ERROR_LEVEL);
     }
 }
