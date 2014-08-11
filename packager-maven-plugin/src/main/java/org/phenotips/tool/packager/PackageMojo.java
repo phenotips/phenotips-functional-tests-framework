@@ -136,7 +136,7 @@ public class PackageMojo extends AbstractMojo
     private RepositorySystem repositorySystem;
 
     /** The current Maven session being executed. */
-    @Component
+    @Parameter(defaultValue = "${session}", readonly = true)
     private MavenSession session;
 
     /** Local repository to be used by the plugin to resolve dependencies. */

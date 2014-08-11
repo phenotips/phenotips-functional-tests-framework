@@ -113,7 +113,7 @@ public class ImportMojo extends AbstractMojo
     private ProjectBuilder projectBuilder;
 
     /** The current Maven session being executed. */
-    @Component
+    @Parameter(defaultValue = "${session}", readonly = true)
     private MavenSession session;
 
     @Override
