@@ -30,7 +30,7 @@
     </encoder>
   </appender>
 
-  <logger name="org.xwiki" level="info"/>
+  <logger name="org.xwiki" level="warn"/>
   <logger name="com.xpn.xwiki" level="warn"/>
 
   <root level="warn">
