@@ -68,9 +68,10 @@ import org.apache.maven.project.ProjectBuilder;
 import com.xpn.xwiki.XWikiContext;
 
 /**
- * Maven 2 plugin to import aset of XWiki documents into an existing database.
+ * Maven plugin for importing a set of XWiki documents into a database.
  *
  * @version $Id$
+ * @since 1.0M1
  */
 @Mojo(
     name = "import",
@@ -200,9 +201,6 @@ public class ImportMojo extends AbstractMojo
         LocalExtension localExtension = localExtensionRepository.storeExtension(extension);
         installedExtensionRepository.installExtension(localExtension, "wiki:xwiki", true);
     }
-
-    // Maven -> Extension
-    // TODO: put all this, what's on core extension scanner and maven repository handler in a commons module
 
     private void toExtension(DefaultLocalExtension extension, Model model, ComponentManager componentManager)
         throws ComponentLookupException
