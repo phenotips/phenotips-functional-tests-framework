@@ -202,7 +202,7 @@ public class PackageMojo extends AbstractMojo
         expandWebapps(webappsDirectory);
 
         // Step 3: Copy all JARs dependencies to the expanded WAR directory in WEB-INF/lib
-        copyLibs(webInfDirectory);
+        copyLibs(libDirectory);
 
         // Step 4: Copy compiled classes in the WEB-INF/classes directory. This allows the tests to provide custom
         // code, for example to override existing components for the test purpose.
