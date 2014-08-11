@@ -19,8 +19,9 @@
  */
 package org.phenotips.tool.packager;
 
+import org.phenotips.tool.utils.MavenUtils;
+import org.phenotips.tool.utils.XContextFactory;
 import org.phenotips.tool.xarimporter.Importer;
-import org.phenotips.tool.xarimporter.XContextFactory;
 
 import org.xwiki.velocity.internal.log.SLF4JLogChute;
 
@@ -55,7 +56,6 @@ import org.apache.maven.artifact.resolver.filter.ExcludesArtifactFilter;
 import org.apache.maven.artifact.resolver.filter.ScopeArtifactFilter;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Dependency;
-import org.apache.maven.model.building.ModelBuildingRequest;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -64,20 +64,12 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
-import org.apache.maven.project.DefaultProjectBuildingRequest;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.ProjectBuilder;
-import org.apache.maven.project.ProjectBuildingException;
-import org.apache.maven.project.ProjectBuildingRequest;
-import org.apache.maven.project.ProjectBuildingResult;
 import org.apache.maven.repository.RepositorySystem;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.Velocity;
 import org.apache.velocity.runtime.RuntimeConstants;
-import org.codehaus.plexus.archiver.zip.ZipUnArchiver;
-import org.codehaus.plexus.logging.Logger;
-import org.codehaus.plexus.logging.console.ConsoleLogger;
-import org.codehaus.plexus.util.FileUtils;
 import org.codehaus.plexus.util.StringUtils;
 import org.hibernate.cfg.Environment;
 
@@ -220,7 +212,7 @@ public class PackageMojo extends AbstractMojo
         // Step 6: Copy HSQLDB JDBC Driver
         getLog().info("Copying HSQLDB JDBC Driver JAR ...");
         Artifact hsqldbArtifact = resolveHSQLDBArtifact();
-        copyFile(hsqldbArtifact.getFile(), libDirectory);
+        org.phenotips.tool.utils.IOUtils.copyFile(hsqldbArtifact.getFile(), libDirectory);
 
         // Step 7: Unzip the specified Skins. If no skin is specified then unzip the Colibri skin only.
         expandSkins(webappDirectory);
@@ -248,7 +240,7 @@ public class PackageMojo extends AbstractMojo
     {
         getLog().info("Expanding Jetty Resources ...");
         Artifact jettyArtifact = resolveJettyArtifact();
-        unzip(jettyArtifact.getFile(), this.outputPackageDirectory);
+        org.phenotips.tool.utils.IOUtils.unzip(jettyArtifact.getFile(), this.outputPackageDirectory);
 
         // Replace maven properties in start shell scripts
         VelocityContext context = createVelocityContext();
@@ -279,17 +271,17 @@ public class PackageMojo extends AbstractMojo
         getLog().info("Expanding WAR dependencies ...");
         for (Artifact warArtifact : resolveWarArtifacts()) {
             getLog().info("  ... Unzipping WAR: " + warArtifact.getFile());
-            unzip(warArtifact.getFile(), new File(webappsDirectory, CONTEXT_PATH));
+            org.phenotips.tool.utils.IOUtils.unzip(warArtifact.getFile(), new File(webappsDirectory, CONTEXT_PATH));
         }
     }
 
     private void copyLibs(File libDirectory) throws MojoExecutionException
     {
         getLog().info("Copying JAR dependencies ...");
-        createDirectory(libDirectory);
+        org.phenotips.tool.utils.IOUtils.createDirectory(libDirectory);
         for (Artifact artifact : resolveJarArtifacts()) {
             getLog().info("  ... Copying JAR: " + artifact.getFile());
-            copyFile(artifact.getFile(), libDirectory);
+            org.phenotips.tool.utils.IOUtils.copyFile(artifact.getFile(), libDirectory);
         }
     }
 
@@ -298,7 +290,7 @@ public class PackageMojo extends AbstractMojo
         getLog().info("Copying Java Classes ...");
         File classesDirectory = new File(webInfDirectory, "classes");
         if (this.outputClassesDirectory.exists()) {
-            copyDirectory(this.outputClassesDirectory, classesDirectory);
+            org.phenotips.tool.utils.IOUtils.copyDirectory(this.outputClassesDirectory, classesDirectory);
         }
     }
 
@@ -309,12 +301,12 @@ public class PackageMojo extends AbstractMojo
         if (this.skinArtifactItems != null) {
             for (SkinArtifactItem skinArtifactItem : this.skinArtifactItems) {
                 Artifact skinArtifact = resolveArtifactItem(skinArtifactItem);
-                unzip(skinArtifact.getFile(), skinsDirectory);
+                org.phenotips.tool.utils.IOUtils.unzip(skinArtifact.getFile(), skinsDirectory);
             }
         } else {
             Artifact colibriArtifact =
                 resolveArtifact(XWIKI_PLATFORM_GROUPID, "xwiki-platform-colibri", this.xwikiVersion, TYPE_ZIP);
-            unzip(colibriArtifact.getFile(), skinsDirectory);
+            org.phenotips.tool.utils.IOUtils.unzip(colibriArtifact.getFile(), skinsDirectory);
         }
     }
 
@@ -424,7 +416,7 @@ public class PackageMojo extends AbstractMojo
 
             // Copy database files to XWiki's data directory.
             File dataDir = this.dataDirectory;
-            copyDirectory(this.databaseDirectory, new File(dataDir, "database"));
+            org.phenotips.tool.utils.IOUtils.copyDirectory(this.databaseDirectory, new File(dataDir, "database"));
 
             try {
                 XContextFactory.disposeXWikiContext(xcontext);
@@ -653,25 +645,9 @@ public class PackageMojo extends AbstractMojo
 
     private MavenProject getTopLevelPOMProject() throws MojoExecutionException
     {
-        return getMavenProject(this.repositorySystem.createProjectArtifact(PHENOTIPS_GROUPID, "phenotips-parent",
-            this.project.getVersion()));
-    }
-
-    private MavenProject getMavenProject(Artifact artifact) throws MojoExecutionException
-    {
-        try {
-            ProjectBuildingRequest request =
-                new DefaultProjectBuildingRequest(this.session.getProjectBuildingRequest())
-                    // We don't want to execute any plugin here
-                    .setProcessPlugins(false)
-                    // It's not this plugin job to validate this pom.xml
-                    .setValidationLevel(ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL);
-            // Note: build() will automatically get the POM artifact corresponding to the passed artifact.
-            ProjectBuildingResult result = this.projectBuilder.build(artifact, request);
-            return result.getProject();
-        } catch (ProjectBuildingException e) {
-            throw new MojoExecutionException(String.format("Failed to build project for [%s]", artifact), e);
-        }
+        return MavenUtils.getMavenProject(
+            this.repositorySystem.createProjectArtifact(PHENOTIPS_GROUPID, "phenotips-parent",
+                this.project.getVersion()), this.session, this.projectBuilder);
     }
 
     private String getDependencyManagementVersion(MavenProject project, String groupId, String artifactId)
@@ -685,55 +661,6 @@ public class PackageMojo extends AbstractMojo
         }
         throw new MojoExecutionException(String.format("Failed to find artifact [%s:%s] in dependency management "
             + "for [%s]", groupId, artifactId, project.toString()));
-    }
-
-    /**
-     * Create the passed directory if it doesn't already exist.
-     *
-     * @param directory the directory to create
-     */
-    private void createDirectory(File directory)
-    {
-        if (!directory.exists()) {
-            directory.mkdirs();
-        }
-    }
-
-    private void copyDirectory(File sourceDirectory, File targetDirectory) throws MojoExecutionException
-    {
-        createDirectory(targetDirectory);
-        try {
-            FileUtils.copyDirectoryStructureIfModified(sourceDirectory, targetDirectory);
-        } catch (IOException e) {
-            throw new MojoExecutionException(String.format("Failed to copy directory [%] to [%]", sourceDirectory,
-                targetDirectory), e);
-        }
-    }
-
-    private void copyFile(File source, File targetDirectory) throws MojoExecutionException
-    {
-        try {
-            FileUtils.copyFileToDirectoryIfModified(source, targetDirectory);
-        } catch (IOException e) {
-            throw new MojoExecutionException(String.format("Failed to copy file [%] to [%]", source, targetDirectory),
-                e);
-        }
-    }
-
-    private void unzip(File source, File targetDirectory) throws MojoExecutionException
-    {
-        createDirectory(targetDirectory);
-        try {
-            ZipUnArchiver unArchiver = new ZipUnArchiver();
-            unArchiver.enableLogging(new ConsoleLogger(Logger.LEVEL_ERROR, "Package"));
-            unArchiver.setSourceFile(source);
-            unArchiver.setDestDirectory(targetDirectory);
-            unArchiver.setOverwrite(true);
-            unArchiver.extract();
-        } catch (Exception e) {
-            throw new MojoExecutionException(String.format("Error unpacking file [%s] into [%s]", source,
-                targetDirectory), e);
-        }
     }
 
     private void resolveArtifact(Artifact artifact) throws MojoExecutionException

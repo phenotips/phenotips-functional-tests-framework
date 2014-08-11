@@ -19,6 +19,9 @@
  */
 package org.phenotips.tool.xarimporter;
 
+import org.phenotips.tool.utils.MavenUtils;
+import org.phenotips.tool.utils.XContextFactory;
+
 import org.xwiki.component.manager.ComponentLookupException;
 import org.xwiki.component.manager.ComponentManager;
 import org.xwiki.extension.DefaultExtensionAuthor;
@@ -50,7 +53,6 @@ import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Developer;
 import org.apache.maven.model.License;
 import org.apache.maven.model.Model;
-import org.apache.maven.model.building.ModelBuildingRequest;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -58,12 +60,8 @@ import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
-import org.apache.maven.project.DefaultProjectBuildingRequest;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.ProjectBuilder;
-import org.apache.maven.project.ProjectBuildingException;
-import org.apache.maven.project.ProjectBuildingRequest;
-import org.apache.maven.project.ProjectBuildingResult;
 
 import com.xpn.xwiki.XWikiContext;
 
@@ -189,7 +187,7 @@ public class ImportMojo extends AbstractMojo
 
         extension.setFile(artifact.getFile());
 
-        MavenProject artifactProject = getMavenProject(artifact);
+        MavenProject artifactProject = MavenUtils.getMavenProject(artifact, this.session, this.projectBuilder);
 
         toExtension(extension, artifactProject.getModel(), componentManager);
 
@@ -244,23 +242,6 @@ public class ImportMojo extends AbstractMojo
                 extension.addDependency(new DefaultExtensionDependency(mavenDependency.getGroupId() + ':'
                     + mavenDependency.getArtifactId(), new DefaultVersionConstraint(mavenDependency.getVersion())));
             }
-        }
-    }
-
-    private MavenProject getMavenProject(Artifact artifact) throws MojoExecutionException
-    {
-        try {
-            ProjectBuildingRequest request =
-                new DefaultProjectBuildingRequest(this.session.getProjectBuildingRequest())
-                    // We don't want to execute any plugin here
-                    .setProcessPlugins(false)
-                    // It's not this plugin job to validate this pom.xml
-                    .setValidationLevel(ModelBuildingRequest.VALIDATION_LEVEL_MINIMAL);
-            // Note: build() will automatically get the POM artifact corresponding to the passed artifact.
-            ProjectBuildingResult result = this.projectBuilder.build(artifact, request);
-            return result.getProject();
-        } catch (ProjectBuildingException e) {
-            throw new MojoExecutionException(String.format("Failed to build project for [%s]", artifact), e);
         }
     }
 

@@ -19,6 +19,8 @@
  */
 package org.phenotips.tool.xarimporter;
 
+import org.phenotips.tool.utils.XContextFactory;
+
 import org.xwiki.model.reference.DocumentReference;
 
 import java.io.File;
