@@ -427,15 +427,15 @@ public class PackageMojo extends AbstractMojo
                 }
             }
 
-            // Copy database files to XWiki's data directory.
-            File dataDir = this.dataDirectory;
-            org.phenotips.tool.utils.IOUtils.copyDirectory(this.databaseDirectory, new File(dataDir, "database"));
-
             try {
                 XContextFactory.disposeXWikiContext(xcontext);
             } catch (Exception e) {
                 throw new MojoExecutionException("Failed to dispose XWiki context", e);
             }
+
+            // Copy database files to XWiki's data directory.
+            File dataDir = this.dataDirectory;
+            org.phenotips.tool.utils.IOUtils.copyDirectory(this.databaseDirectory, new File(dataDir, "database"));
         }
     }
 
