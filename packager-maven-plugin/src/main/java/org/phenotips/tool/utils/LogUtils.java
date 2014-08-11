@@ -58,5 +58,6 @@ public final class LogUtils
         System.setProperty("org.slf4j.simpleLogger.log.org.infinispan", logLevel);
         System.setProperty("org.slf4j.simpleLogger.log.org.reflections", logLevel);
         System.setProperty("org.slf4j.simpleLogger.log.org.hsqldb", logLevel);
+        System.setProperty("org.slf4j.simpleLogger.log.hsqldb.db", logLevel);
     }
 }
