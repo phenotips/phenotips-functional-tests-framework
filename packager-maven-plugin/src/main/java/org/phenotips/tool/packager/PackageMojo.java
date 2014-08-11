@@ -219,7 +219,10 @@ public class PackageMojo extends AbstractMojo
         // Step 7: Unzip the specified Skins. If no skin is specified then unzip the Colibri skin only.
         expandSkins(webappDirectory);
 
-        // Step 8: Import specified XAR files into the database
+        // Step 8: Unzip the Solr indexes
+        expandSolrIndexes();
+
+        // Step 9: Import specified XAR files into the database
         importXARs(webInfDirectory);
     }
 
@@ -266,6 +269,14 @@ public class PackageMojo extends AbstractMojo
                     e);
             }
         }
+    }
+
+    private void expandSolrIndexes() throws MojoExecutionException
+    {
+        getLog().info("Expanding Solr Indexes ...");
+        Artifact solrArtifact = resolveSolrArtifact();
+        org.phenotips.tool.utils.IOUtils.unzip(solrArtifact.getFile(),
+            new File(new File(this.outputPackageDirectory, "data"), "solr"));
     }
 
     private void expandWebapps(File webappsDirectory) throws MojoExecutionException
@@ -506,6 +517,21 @@ public class PackageMojo extends AbstractMojo
         }
 
         return jettyArtifact;
+    }
+
+    private Artifact resolveSolrArtifact() throws MojoExecutionException
+    {
+        String artifactId = "solr-configuration";
+        Artifact solrArtifact = this.repositorySystem.createArtifact(PHENOTIPS_GROUPID, artifactId,
+            this.project.getVersion(), "", TYPE_JAR);
+
+        if (solrArtifact != null) {
+            resolveArtifact(solrArtifact);
+        } else {
+            throw new MojoExecutionException("Failed to locate the solr-configuration artifact");
+        }
+
+        return solrArtifact;
     }
 
     private Collection<Artifact> resolveWarArtifacts() throws MojoExecutionException
