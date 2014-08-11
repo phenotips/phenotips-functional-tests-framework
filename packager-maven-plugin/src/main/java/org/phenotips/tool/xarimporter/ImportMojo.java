@@ -32,6 +32,7 @@ import org.xwiki.extension.ExtensionLicense;
 import org.xwiki.extension.ExtensionLicenseManager;
 import org.xwiki.extension.InstallException;
 import org.xwiki.extension.LocalExtension;
+import org.xwiki.extension.ResolveException;
 import org.xwiki.extension.repository.InstalledExtensionRepository;
 import org.xwiki.extension.repository.LocalExtensionRepository;
 import org.xwiki.extension.repository.LocalExtensionRepositoryException;
@@ -174,7 +175,7 @@ public class ImportMojo extends AbstractMojo
     }
 
     private void installExtension(Artifact artifact, XWikiContext xcontext) throws ComponentLookupException,
-        InstallException, LocalExtensionRepositoryException, MojoExecutionException
+        InstallException, LocalExtensionRepositoryException, MojoExecutionException, ResolveException
     {
         ComponentManager componentManager = (ComponentManager) xcontext.get(ComponentManager.class.getName());
 
@@ -193,6 +194,9 @@ public class ImportMojo extends AbstractMojo
 
         toExtension(extension, artifactProject.getModel(), componentManager);
 
+        if (localExtensionRepository.exists(extension.getId())) {
+            localExtensionRepository.removeExtension(localExtensionRepository.getLocalExtension(extension.getId()));
+        }
         LocalExtension localExtension = localExtensionRepository.storeExtension(extension);
         installedExtensionRepository.installExtension(localExtension, "wiki:xwiki", true);
     }
