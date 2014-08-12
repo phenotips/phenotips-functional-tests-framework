@@ -622,11 +622,6 @@ public class PackageMojo extends AbstractMojo
         mandatoryTopLevelArtifacts.add(this.resolveManagedArtifact(slf4jGroupId, "jcl-over-slf4j", TYPE_JAR));
         mandatoryTopLevelArtifacts.add(this.resolveManagedArtifact(slf4jGroupId, "log4j-over-slf4j", TYPE_JAR));
 
-        // When writing functional tests there's is often the need to export pages as XAR. Thus, in order to make
-        // developer's life easy, we also include the filter module (used for XAR exports).
-        mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact(XWIKI_PLATFORM_GROUPID,
-            "xwiki-platform-filter-instance-oldcore", this.xwikiVersion, null, TYPE_JAR));
-
         return mandatoryTopLevelArtifacts;
     }
 
@@ -638,8 +633,9 @@ public class PackageMojo extends AbstractMojo
                 // log4j-<version>.jar but keeping log4j-over-slf4j-<version>.jar
                 // - Exclude batik-js to prevent conflict with the patched version of Rhino used by yuicompressor used
                 // for JSX. See http://jira.xwiki.org/jira/browse/XWIKI-6151 for more details.
-                new ExcludesArtifactFilter(Arrays.asList("org.apache.xmlgraphic:batik-js",
-                    "commons-logging:commons-logging", "commons-logging:commons-logging-api", "log4j:log4j"))));
+                new ExcludesArtifactFilter(Arrays.asList("org.apache.xmlgraphic:batik-js", "org.slf4j:slf4j-log4j12",
+                    "commons-logging:commons-logging", "commons-logging:commons-logging-api", "log4j:log4j",
+                    "com.bea.xml:jsr173-ri"))));
 
         ArtifactResolutionRequest request =
             new ArtifactResolutionRequest().setArtifact(this.project.getArtifact()).setArtifactDependencies(artifacts)
