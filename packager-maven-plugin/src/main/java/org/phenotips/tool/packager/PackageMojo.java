@@ -257,7 +257,7 @@ public class PackageMojo extends AbstractMojo
         Velocity.setProperty(RuntimeConstants.RUNTIME_LOG_LOGSYSTEM, new SLF4JLogChute());
         Velocity.init();
         for (File startFile : startFiles) {
-            getLog().info(String.format("  Replacing variables in [%s]...", startFile));
+            getLog().debug(String.format("  Replacing variables in [%s]...", startFile));
             try {
                 String content = org.apache.commons.io.FileUtils.readFileToString(startFile);
                 OutputStreamWriter writer = new OutputStreamWriter(new FileOutputStream(startFile));
@@ -283,7 +283,7 @@ public class PackageMojo extends AbstractMojo
     {
         getLog().info("Expanding WAR dependencies ...");
         for (Artifact warArtifact : resolveWarArtifacts()) {
-            getLog().info("  ... Unzipping WAR: " + warArtifact.getFile());
+            getLog().debug("  ... Unzipping WAR: " + warArtifact.getFile());
             org.phenotips.tool.utils.IOUtils.unzip(warArtifact.getFile(), new File(webappsDirectory, CONTEXT_PATH));
         }
     }
@@ -293,7 +293,7 @@ public class PackageMojo extends AbstractMojo
         getLog().info("Copying JAR dependencies ...");
         org.phenotips.tool.utils.IOUtils.createDirectory(libDirectory);
         for (Artifact artifact : resolveJarArtifacts()) {
-            getLog().info("  ... Copying JAR: " + artifact.getFile());
+            getLog().debug("  ... Copying JAR: " + artifact.getFile());
             org.phenotips.tool.utils.IOUtils.copyFile(artifact.getFile(), libDirectory);
         }
     }
@@ -380,7 +380,7 @@ public class PackageMojo extends AbstractMojo
                     String fileName = entry.getName().replace(parsedExtension, "");
                     File outputFile = new File(configurationFileTargetDirectory, fileName);
                     OutputStreamWriter writer = new OutputStreamWriter(new FileOutputStream(outputFile));
-                    getLog().info("Writing config file: " + outputFile);
+                    getLog().debug("Writing config file: " + outputFile);
                     // Note: Init is done once even if this method is called several times...
                     Velocity.init();
                     Velocity.evaluate(context, writer, "", IOUtils.toString(jarInputStream));
