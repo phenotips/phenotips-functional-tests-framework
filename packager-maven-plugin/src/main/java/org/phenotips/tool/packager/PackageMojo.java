@@ -560,7 +560,7 @@ public class PackageMojo extends AbstractMojo
 
     private Collection<Artifact> resolveJarArtifacts() throws MojoExecutionException
     {
-        Set<Artifact> artifactsToResolve = this.project.getArtifacts();
+        Set<Artifact> artifactsToResolve = new HashSet<>(this.project.getDependencyArtifacts());
 
         // Add mandatory dependencies if they're not explicitly specified.
         artifactsToResolve.addAll(getMandatoryJarArtifacts());
@@ -645,7 +645,7 @@ public class PackageMojo extends AbstractMojo
             new ArtifactResolutionRequest().setArtifact(this.project.getArtifact()).setArtifactDependencies(artifacts)
                 .setCollectionFilter(filter).setRemoteRepositories(this.remoteRepositories)
                 .setLocalRepository(this.localRepository).setManagedVersionMap(getManagedVersionMap())
-                .setResolveRoot(false);
+                .setResolveRoot(false).setResolveTransitively(true);
         ArtifactResolutionResult resolutionResult = this.repositorySystem.resolve(request);
         if (resolutionResult.hasExceptions()) {
             throw new MojoExecutionException(String.format("Failed to resolve artifacts [%s]", artifacts,
