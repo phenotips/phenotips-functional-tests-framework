@@ -32,7 +32,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
@@ -48,7 +47,6 @@ import java.util.jar.JarInputStream;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.filefilter.WildcardFileFilter;
 import org.apache.maven.artifact.Artifact;
-import org.apache.maven.artifact.ArtifactUtils;
 import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.artifact.resolver.ArtifactResolutionRequest;
 import org.apache.maven.artifact.resolver.ArtifactResolutionResult;
@@ -159,10 +157,6 @@ public class PackageMojo extends AbstractMojo
     @Parameter(property = "xwiki.version")
     private String xwikiVersion;
 
-    /** List of skin artifacts to include in the packaging. */
-    @Parameter
-    private List<SkinArtifactItem> skinArtifactItems;
-
     /**
      * Maps each dependency of type WAR to a context path which will be used as the target directory when the WAR
      * artifact is extracted. WARs that share the same context path are merged. The order of the WAR artifacts in the
@@ -199,7 +193,7 @@ public class PackageMojo extends AbstractMojo
         expandJettyDistribution();
 
         // Step 2: Get the WAR dependencies and expand them in the package output directory.
-        expandWebapps(webappsDirectory);
+        expandWebapp(webappsDirectory);
 
         // Step 3: Copy all JARs dependencies to the expanded WAR directory in WEB-INF/lib
         copyLibs(libDirectory);
@@ -217,7 +211,7 @@ public class PackageMojo extends AbstractMojo
         org.phenotips.tool.utils.IOUtils.copyFile(hsqldbArtifact.getFile(), libDirectory);
 
         // Step 7: Unzip the specified Skins. If no skin is specified then unzip the Colibri skin only.
-        expandSkins(webappDirectory);
+        expandSkin(webappDirectory);
 
         // Step 8: Unzip the Solr indexes
         expandSolrIndexes();
@@ -279,13 +273,12 @@ public class PackageMojo extends AbstractMojo
             new File(new File(this.outputPackageDirectory, "data"), "solr"));
     }
 
-    private void expandWebapps(File webappsDirectory) throws MojoExecutionException
+    private void expandWebapp(File webappsDirectory) throws MojoExecutionException
     {
-        getLog().info("Expanding WAR dependencies ...");
-        for (Artifact warArtifact : resolveWarArtifacts()) {
-            getLog().debug("  ... Unzipping WAR: " + warArtifact.getFile());
-            org.phenotips.tool.utils.IOUtils.unzip(warArtifact.getFile(), new File(webappsDirectory, CONTEXT_PATH));
-        }
+        getLog().info("Expanding PhenoTips WAR...");
+        Artifact warArtifact =
+            resolveArtifact(PHENOTIPS_GROUPID, "phenotips-base-war", this.project.getVersion(), TYPE_WAR);
+        org.phenotips.tool.utils.IOUtils.unzip(warArtifact.getFile(), new File(webappsDirectory, CONTEXT_PATH));
     }
 
     private void copyLibs(File libDirectory) throws MojoExecutionException
@@ -307,57 +300,13 @@ public class PackageMojo extends AbstractMojo
         }
     }
 
-    private void expandSkins(File webappDirectory) throws MojoExecutionException
+    private void expandSkin(File webappDirectory) throws MojoExecutionException
     {
         getLog().info("Copying Skins ...");
         File skinsDirectory = new File(webappDirectory, "skins");
-        if (this.skinArtifactItems != null) {
-            for (SkinArtifactItem skinArtifactItem : this.skinArtifactItems) {
-                Artifact skinArtifact = resolveArtifactItem(skinArtifactItem);
-                org.phenotips.tool.utils.IOUtils.unzip(skinArtifact.getFile(), skinsDirectory);
-            }
-        } else {
-            Artifact colibriArtifact =
-                resolveArtifact(XWIKI_PLATFORM_GROUPID, "xwiki-platform-colibri", this.xwikiVersion, TYPE_ZIP);
-            org.phenotips.tool.utils.IOUtils.unzip(colibriArtifact.getFile(), skinsDirectory);
-        }
-    }
-
-    private Artifact resolveArtifactItem(ArtifactItem artifactItem) throws MojoExecutionException
-    {
-        // Resolve the version and the type:
-        // - if specified in the artifactItem, use them
-        // - if not specified look for them in the project dependencies
-        String version = artifactItem.getVersion();
-        String type = artifactItem.getType();
-        if (version == null || type == null) {
-            Map<String, Artifact> artifacts = this.project.getArtifactMap();
-            String key = ArtifactUtils.versionlessKey(artifactItem.getGroupId(), artifactItem.getArtifactId());
-            if (artifacts.containsKey(key)) {
-                if (version == null) {
-                    version = artifacts.get(key).getVersion();
-                }
-                if (type == null) {
-                    type = artifacts.get(key).getType();
-                }
-            } else {
-                // Default to the platform version
-                if (version == null) {
-                    version = this.xwikiVersion;
-                }
-                // Default to JAR
-                if (type == null) {
-                    type = TYPE_JAR;
-                }
-            }
-        }
-
-        // Resolve the artifact
-        Artifact artifact =
-            this.repositorySystem.createArtifact(artifactItem.getGroupId(), artifactItem.getArtifactId(), version, "",
-                type);
-        resolveArtifact(artifact);
-        return artifact;
+        Artifact colibriArtifact =
+            resolveArtifact(XWIKI_PLATFORM_GROUPID, "xwiki-platform-colibri", this.xwikiVersion, TYPE_ZIP);
+        org.phenotips.tool.utils.IOUtils.unzip(colibriArtifact.getFile(), skinsDirectory);
     }
 
     private void generateConfigurationFiles(File configurationFileTargetDirectory) throws MojoExecutionException
@@ -532,30 +481,6 @@ public class PackageMojo extends AbstractMojo
         }
 
         return solrArtifact;
-    }
-
-    private Collection<Artifact> resolveWarArtifacts() throws MojoExecutionException
-    {
-        List<Artifact> warArtifacts = new ArrayList<Artifact>();
-
-        // First look for dependencies of type WAR.
-        for (Artifact artifact : this.project.getArtifacts()) {
-            if (artifact.getType().equals(TYPE_WAR)) {
-                warArtifacts.add(artifact);
-            }
-        }
-
-        // If there are no WAR artifacts specified in the list of dependencies then use the default WAR artifacts.
-        if (warArtifacts.isEmpty()) {
-            warArtifacts.add(this.repositorySystem.createArtifact(PHENOTIPS_GROUPID, "phenotips-base-war",
-                this.project.getVersion(), "", TYPE_WAR));
-        }
-
-        for (Artifact warArtifact : warArtifacts) {
-            resolveArtifact(warArtifact);
-        }
-
-        return warArtifacts;
     }
 
     private Collection<Artifact> resolveJarArtifacts() throws MojoExecutionException
