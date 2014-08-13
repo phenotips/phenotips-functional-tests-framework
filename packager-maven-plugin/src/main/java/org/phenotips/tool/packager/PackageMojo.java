@@ -161,6 +161,10 @@ public class PackageMojo extends AbstractMojo
     @Parameter(property = "xwiki.version")
     private String xwikiVersion;
 
+    /** Allows skipping this plugin, for example if it already ran and we just need to run tests again. */
+    @Parameter(property = "package.skip", defaultValue = "false")
+    private boolean skipExecution;
+
     /**
      * Maps each dependency of type WAR to a context path which will be used as the target directory when the WAR
      * artifact is extracted. WARs that share the same context path are merged. The order of the WAR artifacts in the
@@ -230,7 +234,7 @@ public class PackageMojo extends AbstractMojo
 
     protected boolean isSkipExecution()
     {
-        return isSkipTests();
+        return this.skipExecution || isSkipTests();
     }
 
     private boolean isSkipTests()
