@@ -146,8 +146,12 @@ public class PackageMojo extends AbstractMojo
     private String importUser;
 
     /** The default skin to configure for the platform. This may be overridden in the instance preferences. */
-    @Parameter(property = "xwiki.defaultSkin", defaultValue = "colibri")
+    @Parameter(property = "xwiki.defaultSkin", defaultValue = "PhenoTips.Skin")
     private String defaultSkin;
+
+    /** The base skin to configure for the platform. This may be overridden in the instance preferences. */
+    @Parameter(property = "xwiki.defaultBaseSkin", defaultValue = "colibri")
+    private String defaultBaseSkin;
 
     /** The directory name where the data should be placed. */
     @Parameter(property = "xwiki.dataDirectory", defaultValue = "${project.build.directory}/package/data/")
@@ -705,7 +709,7 @@ public class PackageMojo extends AbstractMojo
         props.setProperty("xwikiCfgVirtualUsepath", "1");
         props.setProperty("xwikiCfgEditCommentMandatory", "0");
         props.setProperty("xwikiCfgDefaultSkin", this.defaultSkin);
-        props.setProperty("xwikiCfgDefaultBaseSkin", this.defaultSkin);
+        props.setProperty("xwikiCfgDefaultBaseSkin", this.defaultBaseSkin);
         props.setProperty("xwikiCfgEncoding", "UTF-8");
 
         // Other default configuration properties
