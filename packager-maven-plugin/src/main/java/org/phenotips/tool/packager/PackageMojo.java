@@ -189,34 +189,34 @@ public class PackageMojo extends AbstractMojo
 
         getLog().info("Using platform version: " + this.xwikiVersion);
 
-        // Step 1: Expand Jetty resources into the package output directory.
+        // Expand Jetty resources into the package output directory.
         expandJettyDistribution();
 
-        // Step 2: Get the WAR dependencies and expand them in the package output directory.
+        // Get the WAR dependencies and expand them in the package output directory.
         expandWebapp(webappsDirectory);
 
-        // Step 3: Copy all JARs dependencies to the expanded WAR directory in WEB-INF/lib
+        // Copy all JARs dependencies to the expanded WAR directory in WEB-INF/lib
         copyLibs(libDirectory);
 
-        // Step 4: Copy compiled classes in the WEB-INF/classes directory. This allows the tests to provide custom
+        // Copy compiled classes in the WEB-INF/classes directory. This allows the tests to provide custom
         // code, for example to override existing components for the test purpose.
         copyClasses(webInfDirectory);
 
-        // Step 5: Generate and copy config files.
+        // Generate and copy config files.
         generateConfigurationFiles(webInfDirectory);
 
-        // Step 6: Copy HSQLDB JDBC Driver
+        // Copy HSQLDB JDBC Driver
         getLog().info("Copying HSQLDB JDBC Driver JAR ...");
         Artifact hsqldbArtifact = resolveHSQLDBArtifact();
         org.phenotips.tool.utils.IOUtils.copyFile(hsqldbArtifact.getFile(), libDirectory);
 
-        // Step 7: Unzip the specified Skins. If no skin is specified then unzip the Colibri skin only.
+        // Unzip the specified Skins. If no skin is specified then unzip the Colibri skin only.
         expandSkin(webappDirectory);
 
-        // Step 8: Unzip the Solr indexes
+        // Unzip the Solr indexes
         expandSolrIndexes();
 
-        // Step 9: Import specified XAR files into the database
+        // Import specified XAR files into the database
         importXARs(webInfDirectory);
     }
 
