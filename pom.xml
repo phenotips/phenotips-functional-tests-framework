@@ -457,6 +457,7 @@
   </profiles>
 
   <modules>
+    <module>xwiki-platform-test-overrides</module>
     <module>packager-maven-plugin</module>
     <module>functional-tests-maven-lifecycle</module>
   </modules>

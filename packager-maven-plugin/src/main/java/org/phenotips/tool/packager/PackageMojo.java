@@ -198,6 +198,10 @@ public class PackageMojo extends AbstractMojo
         // Copy all JARs dependencies to the expanded WAR directory in WEB-INF/lib
         copyLibs(libDirectory);
 
+        // Extract custom patched classes overriding the xwiki test framework into the target/classes directory
+        // They will be copied in the right place in the following step
+        expandOverrideClasses();
+
         // Copy compiled classes in the WEB-INF/classes directory. This allows the tests to provide custom
         // code, for example to override existing components for the test purpose.
         copyClasses(webInfDirectory);
@@ -289,6 +293,17 @@ public class PackageMojo extends AbstractMojo
             getLog().debug("  ... Copying JAR: " + artifact.getFile());
             org.phenotips.tool.utils.IOUtils.copyFile(artifact.getFile(), libDirectory);
         }
+    }
+
+    private void expandOverrideClasses() throws MojoExecutionException
+    {
+        getLog().info("Expanding patched Java Classes ...");
+        String version =
+            getTopLevelPOMProject().getExtensionArtifactMap().get("org.phenotips:phenotips-functional-tests-lifecycle")
+                .getVersion();
+        Artifact overrideArtifact =
+            resolveArtifact(PHENOTIPS_GROUPID, "xwiki-platform-test-overrides", version, TYPE_JAR);
+        org.phenotips.tool.utils.IOUtils.unzip(overrideArtifact.getFile(), this.outputClassesDirectory);
     }
 
     private void copyClasses(File webInfDirectory) throws MojoExecutionException
