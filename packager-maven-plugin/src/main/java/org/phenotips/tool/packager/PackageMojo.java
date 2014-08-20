@@ -176,7 +176,7 @@ public class PackageMojo extends AbstractMojo
 
     /**
      * Indicate if the package mojo is used for tests. Among other things it means it's then possible to skip it using
-     * skipTetsts system property.
+     * skipTests system property.
      */
     @Parameter(defaultValue = "true")
     private boolean test;
