@@ -64,6 +64,7 @@ import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.ProjectBuilder;
+import org.hibernate.cfg.Environment;
 
 import com.xpn.xwiki.XWikiContext;
 
@@ -123,6 +124,9 @@ public class ImportMojo extends AbstractMojo
         Importer importer = new Importer();
 
         System.setProperty("xwiki.data.dir", this.xwikiDataDir.getAbsolutePath());
+        // If the package mojo was executed before, it might have left a different database connection URL in the
+        // environment, which apparently overrides the value in the configuration file
+        System.setProperty(Environment.URL, null);
 
         if (this.sourceDirectory != null) {
             try {
