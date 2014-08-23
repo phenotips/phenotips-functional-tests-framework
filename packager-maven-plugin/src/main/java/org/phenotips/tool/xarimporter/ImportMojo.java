@@ -126,7 +126,7 @@ public class ImportMojo extends AbstractMojo
         System.setProperty("xwiki.data.dir", this.xwikiDataDir.getAbsolutePath());
         // If the package mojo was executed before, it might have left a different database connection URL in the
         // environment, which apparently overrides the value in the configuration file
-        System.setProperty(Environment.URL, null);
+        System.clearProperty(Environment.URL);
 
         if (this.sourceDirectory != null) {
             try {
