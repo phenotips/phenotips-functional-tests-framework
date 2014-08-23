@@ -75,7 +75,6 @@ import com.xpn.xwiki.XWikiContext;
  */
 @Mojo(
     name = "import",
-    requiresProject = true,
     requiresDependencyResolution = ResolutionScope.COMPILE)
 public class ImportMojo extends AbstractMojo
 {

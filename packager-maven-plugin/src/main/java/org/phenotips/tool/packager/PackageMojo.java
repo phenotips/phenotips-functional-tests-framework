@@ -83,7 +83,6 @@ import com.xpn.xwiki.XWikiContext;
 @Mojo(
     name = "package",
     defaultPhase = LifecyclePhase.PACKAGE,
-    requiresProject = true,
     requiresDependencyResolution = ResolutionScope.RUNTIME,
     threadSafe = true)
 public class PackageMojo extends AbstractMojo
