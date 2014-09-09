@@ -28,6 +28,7 @@ import org.xwiki.context.ExecutionContextManager;
 import org.xwiki.model.reference.DocumentReference;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.sql.Connection;
@@ -77,6 +78,22 @@ public final class XContextFactory
      */
     public static XWikiContext createXWikiContext(String databaseName, File hibernateConfig) throws Exception
     {
+        return createXWikiContext(databaseName, hibernateConfig, null);
+    }
+
+    /**
+     * Create a new XWikiContext configured with a specific database connection.
+     *
+     * @param databaseName the schema or database name to connect to
+     * @param hibernateConfig the Hibernate configuration file containing the database connection definition (JDBC
+     *            driver, username and password, etc)
+     * @param xwikiConfig an optional {@code xwiki.cfg} file to use as the XWiki configuration
+     * @return a valid XWikiContext using the passed Hibernate configuration
+     * @throws Exception failed to initialize context
+     */
+    public static XWikiContext createXWikiContext(String databaseName, File hibernateConfig, File xwikiConfig)
+        throws Exception
+    {
         // Initialize the Component Manager and Environment
         ComponentManager cm = org.xwiki.environment.System.initialize();
         Utils.setComponentManager(cm);
@@ -112,7 +129,12 @@ public final class XContextFactory
         // currently requires rendering object properties, which requires a current document in the context.
         xcontext.setDoc(new XWikiDocument(new DocumentReference(databaseName, "dummySpace", "dummyPage")));
 
-        XWikiConfig config = new XWikiConfig();
+        XWikiConfig config;
+        if (xwikiConfig != null && xwikiConfig.isFile() && xwikiConfig.canRead()) {
+            config = new XWikiConfig(new FileInputStream(xwikiConfig));
+        } else {
+            config = new XWikiConfig();
+        }
         config.put("xwiki.store.class", "com.xpn.xwiki.store.XWikiHibernateStore");
 
         // The XWikiConfig object requires path to be in unix format (i.e. with forward slashes)

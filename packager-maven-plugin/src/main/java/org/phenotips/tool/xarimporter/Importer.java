@@ -56,7 +56,7 @@ public class Importer
      */
     public void importDocuments(File sourceDirectory, String databaseName, File hibernateConfig) throws Exception
     {
-        importDocuments(sourceDirectory, databaseName, hibernateConfig, null);
+        importDocuments(sourceDirectory, databaseName, hibernateConfig, null, null);
     }
 
     /**
@@ -68,15 +68,35 @@ public class Importer
      * @param databaseName some database name (TODO: find out what this name is really)
      * @param hibernateConfig the Hibernate config fill containing the database definition (JDBC driver, username and
      *            password, etc)
+     * @param xwikiConfig an optional {@code xwiki.cfg} file to use as the XWiki configuration
+     * @throws Exception if the import failed for any reason
+     * @todo Replace the Hibernate config file with a list of parameters required for the importation
+     */
+    public void importDocuments(File sourceDirectory, String databaseName, File hibernateConfig, File xwikiConfig)
+        throws Exception
+    {
+        importDocuments(sourceDirectory, databaseName, hibernateConfig, xwikiConfig, null);
+    }
+
+    /**
+     * Import documents defined in an XML file located in the passed document definition directory into a database
+     * defined by its passed name and by an Hibernate configuration file.
+     *
+     * @param sourceDirectory the directory where the package.xml file is located and where the documents to import are
+     *            located
+     * @param databaseName some database name (TODO: find out what this name is really)
+     * @param hibernateConfig the Hibernate config fill containing the database definition (JDBC driver, username and
+     *            password, etc)
+     * @param xwikiConfig an optional {@code xwiki.cfg} file to use as the XWiki configuration
      * @param importUser optionally the user under which to perform the import (useful for example when importing pages
      *            that need to have Programming Rights and the page author is not the same as the importing user)
      * @throws Exception if the import failed for any reason
      * @todo Replace the Hibernate config file with a list of parameters required for the importation
      */
-    public void importDocuments(File sourceDirectory, String databaseName, File hibernateConfig, String importUser)
-        throws Exception
+    public void importDocuments(File sourceDirectory, String databaseName, File hibernateConfig, File xwikiConfig,
+        String importUser) throws Exception
     {
-        XWikiContext xcontext = XContextFactory.createXWikiContext(databaseName, hibernateConfig);
+        XWikiContext xcontext = XContextFactory.createXWikiContext(databaseName, hibernateConfig, xwikiConfig);
 
         Package pack = new Package();
         pack.setWithVersions(false);

@@ -98,6 +98,10 @@ public class ImportMojo extends AbstractMojo
     private File hibernateConfig;
 
     /** @see org.phenotips.tool.xarimporter.Importer#importDocuments(java.io.File, String, java.io.File) */
+    @Parameter(defaultValue = "${basedir}/src/main/packager/xwiki.cfg")
+    private File xwikiConfig;
+
+    /** @see org.phenotips.tool.xarimporter.Importer#importDocuments(java.io.File, String, java.io.File) */
     @Parameter
     private File sourceDirectory;
 
@@ -130,13 +134,14 @@ public class ImportMojo extends AbstractMojo
 
         if (this.sourceDirectory != null) {
             try {
-                importer.importDocuments(this.sourceDirectory, this.databaseName, this.hibernateConfig);
+                importer.importDocuments(this.sourceDirectory, this.databaseName, this.hibernateConfig,
+                    this.xwikiConfig);
             } catch (Exception e) {
                 throw new MojoExecutionException("Failed to import XWiki documents", e);
             }
         } else {
             try {
-                importDependencies(importer, this.databaseName, this.hibernateConfig);
+                importDependencies(importer, this.databaseName, this.hibernateConfig, this.xwikiConfig);
             } catch (Exception e) {
                 throw new MojoExecutionException("Failed to import XAR dependencies", e);
             }
@@ -150,9 +155,10 @@ public class ImportMojo extends AbstractMojo
      *            password, etc)
      * @throws Exception failed to import dependencies
      */
-    private void importDependencies(Importer importer, String databaseName, File hibernateConfig) throws Exception
+    private void importDependencies(Importer importer, String databaseName, File hibernateConfig, File xwikiConfig)
+        throws Exception
     {
-        XWikiContext xcontext = XContextFactory.createXWikiContext(databaseName, hibernateConfig);
+        XWikiContext xcontext = XContextFactory.createXWikiContext(databaseName, hibernateConfig, xwikiConfig);
 
         // Reverse artifact order to have dependencies first (despite the fact that it's a Set it's actually an ordered
         // LinkedHashSet behind the scene)
