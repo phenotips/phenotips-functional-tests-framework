@@ -68,7 +68,7 @@
         </exclusion>
       </exclusions>
     </dependency>
-    <!-- XWiki -->
+    <!-- XWiki dependencies, used at runtime by the import mojo -->
     <dependency>
       <groupId>org.xwiki.platform</groupId>
       <artifactId>xwiki-platform-oldcore</artifactId>
