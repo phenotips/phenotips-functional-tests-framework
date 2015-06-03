@@ -28,4 +28,7 @@
   <suppress checks="ClassFanOutComplexity" files="ImportMojo.java"/>
   <suppress checks="ClassFanOutComplexity" files="PackageMojo.java"/>
   <suppress checks="ClassFanOutComplexity" files="XContextFactory.java"/>
+  <suppress checks="ClassDataAbstractionCoupling" files="ImportMojo.java"/>
+  <suppress checks="ClassDataAbstractionCoupling" files="PackageMojo.java"/>
+  <suppress checks="ClassDataAbstractionCoupling" files="XContextFactory.java"/>
 </suppressions>

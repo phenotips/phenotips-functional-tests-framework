@@ -520,7 +520,7 @@ public class PackageMojo extends AbstractMojo
         Set<Artifact> jarArtifacts = new HashSet<Artifact>();
         for (Artifact artifact : resolvedArtifacts) {
             // Note: test-jar is used in functional tests from time to time and we need to package them too.
-            if (artifact.getType().equals(TYPE_JAR) || artifact.getType().equals("test-jar")) {
+            if (TYPE_JAR.equals(artifact.getType()) || "test-jar".equals(artifact.getType())) {
                 jarArtifacts.add(artifact);
             }
         }
