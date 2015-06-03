@@ -25,7 +25,7 @@
   <parent>
     <groupId>org.phenotips</groupId>
     <artifactId>phenotips-testing-framework</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0-milestone-4</version>
   </parent>
   <artifactId>xwiki-platform-test-overrides</artifactId>
   <name>PhenoTips - Tools - Patched XWiki Test Framework</name>
