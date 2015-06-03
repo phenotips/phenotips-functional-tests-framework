@@ -172,7 +172,7 @@ public final class XContextFactory
     {
         shutdownHSQLDB(xcontext);
         @SuppressWarnings("deprecation")
-        ComponentManager componentManager = Utils.getComponentManager();
+        ComponentManager componentManager = Utils.getRootComponentManager();
 
         // Remove ExecutionContext
         Execution execution = componentManager.getInstance(Execution.class);
