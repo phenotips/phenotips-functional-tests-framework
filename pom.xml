@@ -126,9 +126,9 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <phenotips.version>1.1.1</phenotips.version>
-    <xwiki.version>7.0.1</xwiki.version>
-    <slf4j.version>1.7.7</slf4j.version>
+    <phenotips.version>1.2.5</phenotips.version>
+    <xwiki.version>7.1.4</xwiki.version>
+    <slf4j.version>1.7.20</slf4j.version>
   </properties>
 
   <build>
