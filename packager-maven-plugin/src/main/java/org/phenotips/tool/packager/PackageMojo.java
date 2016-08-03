@@ -554,7 +554,7 @@ public class PackageMojo extends AbstractMojo
         mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact(XWIKI_PLATFORM_GROUPID,
             "xwiki-platform-security-bridge", this.xwikiVersion, null, TYPE_JAR));
         mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact(XWIKI_PLATFORM_GROUPID,
-            "xwiki-platform-url-standard", this.xwikiVersion, null, TYPE_JAR));
+            "xwiki-platform-url-scheme-standard", this.xwikiVersion, null, TYPE_JAR));
         mandatoryTopLevelArtifacts.add(this.repositorySystem.createArtifact(XWIKI_PLATFORM_GROUPID,
             "xwiki-platform-wiki-default", this.xwikiVersion, null, TYPE_JAR));
 
