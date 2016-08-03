@@ -23,7 +23,7 @@
   <parent>
     <groupId>org.phenotips</groupId>
     <artifactId>phenotips-testing-framework</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.1</version>
   </parent>
   <artifactId>phenotips-packager-maven-plugin</artifactId>
   <name>PhenoTips - Tools - Packager Maven Plugin</name>
