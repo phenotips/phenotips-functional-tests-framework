@@ -17,26 +17,49 @@
  */
 package org.xwiki.test.ui;
 
-import org.xwiki.rest.model.jaxb.ObjectFactory;
+import org.xwiki.component.manager.ComponentManager;
+import org.xwiki.model.EntityType;
+import org.xwiki.model.internal.reference.DefaultStringEntityReferenceSerializer;
+import org.xwiki.model.internal.reference.RelativeStringEntityReferenceResolver;
+import org.xwiki.model.reference.AttachmentReference;
+import org.xwiki.model.reference.DocumentReference;
+import org.xwiki.model.reference.EntityReference;
+import org.xwiki.model.reference.EntityReferenceResolver;
+import org.xwiki.model.reference.EntityReferenceSerializer;
+import org.xwiki.model.reference.LocalDocumentReference;
+import org.xwiki.rest.model.jaxb.Page;
+import org.xwiki.rest.model.jaxb.Property;
 import org.xwiki.rest.model.jaxb.Xwiki;
+import org.xwiki.rest.resources.attachments.AttachmentResource;
+import org.xwiki.rest.resources.classes.ClassPropertyResource;
+import org.xwiki.rest.resources.objects.ObjectPropertyResource;
+import org.xwiki.rest.resources.objects.ObjectResource;
+import org.xwiki.rest.resources.objects.ObjectsResource;
+import org.xwiki.rest.resources.pages.PageResource;
 import org.xwiki.test.integration.XWikiExecutor;
 import org.xwiki.test.ui.po.ViewPage;
 import org.xwiki.test.ui.po.editor.ClassEditPage;
 import org.xwiki.test.ui.po.editor.ObjectEditPage;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
+import java.net.URI;
 import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response.Status;
@@ -47,23 +70,26 @@ import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
 
 import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpMethod;
 import org.apache.commons.httpclient.UsernamePasswordCredentials;
 import org.apache.commons.httpclient.auth.AuthScope;
+import org.apache.commons.httpclient.methods.DeleteMethod;
+import org.apache.commons.httpclient.methods.EntityEnclosingMethod;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.methods.InputStreamRequestEntity;
+import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.PutMethod;
 import org.apache.commons.httpclient.methods.RequestEntity;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
+import org.junit.Assert;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Cookie;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedCondition;
-import org.openqa.selenium.support.ui.Wait;
-import org.openqa.selenium.support.ui.WebDriverWait;
 
 /**
  * Helper methods for testing, not related to a specific Page Object. Also made available to tests classes.
@@ -76,32 +102,76 @@ public class TestUtils
     /**
      * @since 5.0M2
      */
-    public static final UsernamePasswordCredentials ADMIN_CREDENTIALS = new UsernamePasswordCredentials("Admin",
-        "admin");
+    public static final UsernamePasswordCredentials ADMIN_CREDENTIALS =
+        new UsernamePasswordCredentials("Admin", "admin");
 
     /**
      * @since 5.1M1
      */
-    public static final UsernamePasswordCredentials SUPER_ADMIN_CREDENTIALS = new UsernamePasswordCredentials(
-        "superadmin", "pass");
+    public static final UsernamePasswordCredentials SUPER_ADMIN_CREDENTIALS =
+        new UsernamePasswordCredentials("superadmin", "pass");
 
     /**
      * @since 5.0M2
+     * @deprecated since 7.3M1, use {@link #getBaseURL()} instead
      */
+    @Deprecated
     public static final String BASE_URL = XWikiExecutor.URL + ":" + XWikiExecutor.DEFAULT_PORT
         + XWikiExecutor.WEBAPP_PATH + "/";
 
     /**
      * @since 5.0M2
+     * @deprecated since 7.3M1, use {@link #getBaseBinURL()} instead
      */
+    @Deprecated
     public static final String BASE_BIN_URL = BASE_URL + "bin/";
 
     /**
      * @since 5.0M2
+     * @deprecated since 7.3M1, use {@link RestTestUtils#getBaseURL()} instead
      */
+    @Deprecated
     public static final String BASE_REST_URL = BASE_URL + "rest/";
 
+    /**
+     * @since 7.3M1
+     */
+    public static final int[] STATUS_OK_NOT_FOUND =
+        new int[] { Status.OK.getStatusCode(), Status.NOT_FOUND.getStatusCode() };
+
+    /**
+     * @since 7.3M1
+     */
+    public static final int[] STATUS_OK = new int[] { Status.OK.getStatusCode() };
+
+    /**
+     * @since 7.3M1
+     */
+    public static final int[] STATUS_NO_CONTENT = new int[] { Status.NO_CONTENT.getStatusCode() };
+
+    /**
+     * @since 7.3M1
+     */
+    public static final int[] STATUS_CREATED_ACCEPTED =
+        new int[] { Status.CREATED.getStatusCode(), Status.ACCEPTED.getStatusCode() };
+
+    /**
+     * @since 7.3M1
+     */
+    public static final int[] STATUS_CREATED = new int[] { Status.CREATED.getStatusCode() };
+
+    private static final RelativeStringEntityReferenceResolver RELATIVE_RESOLVER =
+        new RelativeStringEntityReferenceResolver();
+
+    private static DefaultStringEntityReferenceSerializer SERIALIZER = new DefaultStringEntityReferenceSerializer();
+
     private static PersistentTestContext context;
+
+    private static ComponentManager componentManager;
+
+    private static EntityReferenceResolver<String> referenceResolver;
+
+    private static EntityReferenceSerializer<String> referenceSerializer;
 
     /**
      * Used to convert Java object into its REST XML representation.
@@ -113,42 +183,46 @@ public class TestUtils
      */
     private static Unmarshaller unmarshaller;
 
-    /**
-     * Used to create REST Java resources.
-     */
-    private static ObjectFactory objectFactory;
-
-    {
-        {
-            try {
-                // Initialize REST related tools
-                JAXBContext context =
-                    JAXBContext.newInstance("org.xwiki.rest.model.jaxb"
-                        + ":org.xwiki.extension.repository.xwiki.model.jaxb");
-                marshaller = context.createMarshaller();
-                unmarshaller = context.createUnmarshaller();
-                objectFactory = new ObjectFactory();
-            } catch (JAXBException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
-    /**
-     * How long to wait before failing a test because an element cannot be found. Can be overridden with setTimeout.
-     */
-    private int timeout = 10;
-
     /** Cached secret token. TODO cache for each user. */
     private String secretToken = null;
 
-    private HttpClient adminHTTPClient;
+    private HttpClient httpClient;
+
+    /**
+     * @since 7.3M1
+     */
+    private XWikiExecutor executor;
+
+    /**
+     * @since 7.3M1
+     */
+    private String currentWiki = "xwiki";
+
+    private RestTestUtils rest;
 
     public TestUtils()
     {
-        this.adminHTTPClient = new HttpClient();
-        this.adminHTTPClient.getState().setCredentials(AuthScope.ANY, ADMIN_CREDENTIALS);
-        this.adminHTTPClient.getParams().setAuthenticationPreemptive(true);
+        this.httpClient = new HttpClient();
+        this.httpClient.getState().setCredentials(AuthScope.ANY, SUPER_ADMIN_CREDENTIALS);
+        this.httpClient.getParams().setAuthenticationPreemptive(true);
+
+        this.rest = new RestTestUtils(this);
+    }
+
+    /**
+     * @since 7.3M1
+     */
+    public XWikiExecutor getExecutor()
+    {
+        return this.executor;
+    }
+
+    /**
+     * @since 7.3M1
+     */
+    public void setExecutor(XWikiExecutor executor)
+    {
+        this.executor = executor;
     }
 
     /** Used so that AllTests can set the persistent test context. */
@@ -157,7 +231,14 @@ public class TestUtils
         TestUtils.context = context;
     }
 
-    protected WebDriver getDriver()
+    public static void initializeComponent(ComponentManager componentManager) throws Exception
+    {
+        TestUtils.componentManager = componentManager;
+        TestUtils.referenceResolver = TestUtils.componentManager.getInstance(EntityReferenceResolver.TYPE_STRING);
+        TestUtils.referenceSerializer = TestUtils.componentManager.getInstance(EntityReferenceSerializer.TYPE_STRING);
+    }
+
+    protected XWikiWebDriver getDriver()
     {
         return context.getDriver();
     }
@@ -180,6 +261,71 @@ public class TestUtils
             this.secretToken = session.getSecretToken();
         } else {
             recacheSecretToken();
+        }
+    }
+
+    /**
+     * @since 7.0RC1
+     */
+    public void setDefaultCredentials(String username, String password)
+    {
+        this.httpClient.getState().setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(username, password));
+    }
+
+    /**
+     * @since 7.0RC1
+     */
+    public void setDefaultCredentials(UsernamePasswordCredentials defaultCredentials)
+    {
+        this.httpClient.getState().setCredentials(AuthScope.ANY, defaultCredentials);
+    }
+
+    public UsernamePasswordCredentials getDefaultCredentials()
+    {
+        return (UsernamePasswordCredentials) this.httpClient.getState().getCredentials(AuthScope.ANY);
+    }
+
+    public void loginAsSuperAdmin()
+    {
+        login(SUPER_ADMIN_CREDENTIALS.getUserName(), SUPER_ADMIN_CREDENTIALS.getPassword());
+    }
+
+    public void loginAsSuperAdminAndGotoPage(String pageURL)
+    {
+        loginAndGotoPage(SUPER_ADMIN_CREDENTIALS.getUserName(), SUPER_ADMIN_CREDENTIALS.getPassword(), pageURL);
+    }
+
+    public void loginAsAdmin()
+    {
+        login(ADMIN_CREDENTIALS.getUserName(), ADMIN_CREDENTIALS.getPassword());
+    }
+
+    public void loginAsAdminAndGotoPage(String pageURL)
+    {
+        loginAndGotoPage(ADMIN_CREDENTIALS.getUserName(), ADMIN_CREDENTIALS.getPassword(), pageURL);
+    }
+
+    public void login(String username, String password)
+    {
+        loginAndGotoPage(username, password, null);
+    }
+
+    public void loginAndGotoPage(String username, String password, String pageURL)
+    {
+        if (!username.equals(getLoggedInUserName())) {
+            // Log in and direct to a non existent page so that it loads very fast and we don't incur the time cost of
+            // going to the home page for example.
+            // Also recache the CSRF token
+            getDriver().get(getURLToLoginAndGotoPage(username, password, getURL("XWiki", "Register", "register")));
+            recacheSecretTokenWhenOnRegisterPage();
+            if (pageURL != null) {
+                // Go to the page asked
+                getDriver().get(pageURL);
+            } else {
+                getDriver().get(getURLToNonExistentPage());
+            }
+
+            setDefaultCredentials(username, password);
         }
     }
 
@@ -258,13 +404,11 @@ public class TestUtils
     /**
      * After successful completion of this function, you are guaranteed to be logged in as the given user and on the
      * page passed in pageURL.
-     *
-     * @param pageURL
      */
     public void assertOnPage(final String pageURL)
     {
         final String pageURI = pageURL.replaceAll("\\?.*", "");
-        waitUntilCondition(new ExpectedCondition<Boolean>()
+        getDriver().waitUntilCondition(new ExpectedCondition<Boolean>()
         {
             @Override
             public Boolean apply(WebDriver driver)
@@ -274,28 +418,19 @@ public class TestUtils
         });
     }
 
-    public <T> void waitUntilCondition(ExpectedCondition<T> condition)
-    {
-        // Temporarily remove the implicit wait on the driver since we're doing our own waits...
-        getDriver().manage().timeouts().implicitlyWait(0, TimeUnit.SECONDS);
-
-        Wait<WebDriver> wait = new WebDriverWait(getDriver(), getTimeout());
-        try {
-            wait.until(condition);
-        } finally {
-            // Reset timeout
-            setDriverImplicitWait(getDriver());
-        }
-    }
-
     public String getLoggedInUserName()
     {
-        String loggedInUserName = null;
-        List<WebElement> elements = findElementsWithoutWaiting(getDriver(), By.xpath("//div[@id='tmUser']/span/a"));
-        if (!elements.isEmpty()) {
-            String href = elements.get(0).getAttribute("href");
-            loggedInUserName = href.substring(href.lastIndexOf("/") + 1);
+        By userAvatarInDrawer = By.id("tmUser");
+        if (!getDriver().hasElementWithoutWaiting(userAvatarInDrawer)) {
+            // Guest
+            return null;
         }
+
+        WebElement element = getDriver().findElementWithoutWaiting(userAvatarInDrawer);
+        String href = element.getAttribute("href");
+        String loggedInUserName = href.substring(href.lastIndexOf("/") + 1);
+
+        // Return
         return loggedInUserName;
     }
 
@@ -308,11 +443,13 @@ public class TestUtils
         Object... properties)
     {
         createUser(username, password, getURLToLoginAndGotoPage(username, password, url), properties);
+
+        setDefaultCredentials(username, password);
     }
 
     public void createUser(final String username, final String password, String redirectURL, Object... properties)
     {
-        Map<String, String> parameters = new HashMap<String, String>();
+        Map<String, String> parameters = new HashMap<>();
         parameters.put("register", "1");
         parameters.put("xwikiname", username);
         parameters.put("register_password", password);
@@ -320,21 +457,11 @@ public class TestUtils
         parameters.put("register_email", "");
         parameters.put("xredirect", redirectURL);
         parameters.put("form_token", getSecretToken());
-        getDriver().get(getURL("XWiki", "Register", "register", parameters));
+        loginAsSuperAdminAndGotoPage(getURL("XWiki", "Register", "register", parameters));
         recacheSecretToken();
         if (properties.length > 0) {
             updateObject("XWiki", username, "XWiki.XWikiUsers", 0, properties);
         }
-    }
-
-    /**
-     * @deprecated starting with 5.0M2 use {@link #createUserAndLogin(String, String, Object...)} instead
-     */
-    @Deprecated
-    public void registerLoginAndGotoPage(final String username, final String password, final String pageURL)
-    {
-        createUserAndLogin(username, password);
-        getDriver().get(pageURL);
     }
 
     public ViewPage gotoPage(String space, String page)
@@ -343,9 +470,26 @@ public class TestUtils
         return new ViewPage();
     }
 
+    /**
+     * @since 7.2M2
+     */
+    public ViewPage gotoPage(EntityReference reference)
+    {
+        gotoPage(reference, "view");
+        return new ViewPage();
+    }
+
     public void gotoPage(String space, String page, String action)
     {
         gotoPage(space, page, action, "");
+    }
+
+    /**
+     * @since 7.2M2
+     */
+    public void gotoPage(EntityReference reference, String action)
+    {
+        gotoPage(reference, action, "");
     }
 
     /**
@@ -358,13 +502,50 @@ public class TestUtils
 
     public void gotoPage(String space, String page, String action, Map<String, ?> queryParameters)
     {
-        gotoPage(space, page, action, toQueryString(queryParameters));
+        gotoPage(Collections.singletonList(space), page, action, queryParameters);
+    }
+
+    /**
+     * @since 7.2M2
+     */
+    public void gotoPage(List<String> spaces, String page, String action, Map<String, ?> queryParameters)
+    {
+        gotoPage(spaces, page, action, toQueryString(queryParameters));
+    }
+
+    /**
+     * @since 7.2M2
+     */
+    public void gotoPage(EntityReference reference, String action, Map<String, ?> queryParameters)
+    {
+        gotoPage(reference, action, toQueryString(queryParameters));
     }
 
     public void gotoPage(String space, String page, String action, String queryString)
     {
-        // Only navigate if the current URL is different from the one to go to, in order to improve performances.
-        gotoPage(getURL(space, page, action, queryString));
+        gotoPage(Collections.singletonList(space), page, action, queryString);
+    }
+
+    /**
+     * @since 7.2M2
+     */
+    public void gotoPage(List<String> spaces, String page, String action, String queryString)
+    {
+        gotoPage(getURL(spaces, page, action, queryString));
+    }
+
+    /**
+     * @since 7.2M2
+     */
+    public void gotoPage(EntityReference reference, String action, String queryString)
+    {
+        gotoPage(getURL(reference, action, queryString));
+
+        // Update current wiki
+        EntityReference wikiReference = reference.extractReference(EntityType.WIKI);
+        if (wikiReference != null) {
+            this.currentWiki = wikiReference.getName();
+        }
     }
 
     public void gotoPage(String url)
@@ -381,29 +562,78 @@ public class TestUtils
     }
 
     /**
+     * @since 7.2M2
+     */
+    public String getURLToDeletePage(EntityReference reference)
+    {
+        return getURL(reference, "delete", "confirm=1");
+    }
+
+    /**
      * @param space the name of the space to delete
      * @return the URL that can be used to delete the specified pace
      * @since 4.5
      */
     public String getURLToDeleteSpace(String space)
     {
-        return getURL(space, "WebHome", "deletespace", "confirm=1");
+        return getURL(space, "WebHome", "deletespace", "confirm=1&async=false&affectChidlren=on");
     }
 
     public ViewPage createPage(String space, String page, String content, String title)
     {
-        return createPage(space, page, content, title, null);
+        return createPage(Collections.singletonList(space), page, content, title);
+    }
+
+    /**
+     * @since 7.2M2
+     */
+    public ViewPage createPage(EntityReference reference, String content, String title)
+    {
+        return createPage(reference, content, title, null);
+    }
+
+    /**
+     * @since 7.2M2
+     */
+    public ViewPage createPage(List<String> spaces, String page, String content, String title)
+    {
+        return createPage(spaces, page, content, title, null);
     }
 
     public ViewPage createPage(String space, String page, String content, String title, String syntaxId)
     {
-        return createPage(space, page, content, title, syntaxId, null);
+        return createPage(Collections.singletonList(space), page, content, title, syntaxId);
+    }
+
+    /**
+     * @since 7.2M2
+     */
+    public ViewPage createPage(EntityReference reference, String content, String title, String syntaxId)
+    {
+        return createPage(reference, content, title, syntaxId, null);
+    }
+
+    /**
+     * @since 7.2M2
+     */
+    public ViewPage createPage(List<String> spaces, String page, String content, String title, String syntaxId)
+    {
+        return createPage(spaces, page, content, title, syntaxId, null);
     }
 
     public ViewPage createPage(String space, String page, String content, String title, String syntaxId,
         String parentFullPageName)
     {
-        Map<String, String> queryMap = new HashMap<String, String>();
+        return createPage(Collections.singletonList(space), page, content, title, syntaxId, parentFullPageName);
+    }
+
+    /**
+     * @since 7.2M2
+     */
+    public ViewPage createPage(List<String> spaces, String page, String content, String title, String syntaxId,
+        String parentFullPageName)
+    {
+        Map<String, String> queryMap = new HashMap<>();
         if (content != null) {
             queryMap.put("content", content);
         }
@@ -416,7 +646,30 @@ public class TestUtils
         if (parentFullPageName != null) {
             queryMap.put("parent", parentFullPageName);
         }
-        gotoPage(space, page, "save", queryMap);
+        gotoPage(spaces, page, "save", queryMap);
+        return new ViewPage();
+    }
+
+    /**
+     * @since 7.2M2
+     */
+    public ViewPage createPage(EntityReference reference, String content, String title, String syntaxId,
+        String parentFullPageName)
+    {
+        Map<String, String> queryMap = new HashMap<>();
+        if (content != null) {
+            queryMap.put("content", content);
+        }
+        if (title != null) {
+            queryMap.put("title", title);
+        }
+        if (syntaxId != null) {
+            queryMap.put("syntaxId", syntaxId);
+        }
+        if (parentFullPageName != null) {
+            queryMap.put("parent", parentFullPageName);
+        }
+        gotoPage(reference, "save", queryMap);
         return new ViewPage();
     }
 
@@ -437,8 +690,19 @@ public class TestUtils
         String parentFullPageName, String attachmentName, InputStream attachmentData,
         UsernamePasswordCredentials credentials) throws Exception
     {
-        ViewPage vp = createPage(space, page, content, title, syntaxId, parentFullPageName);
-        attachFile(space, page, attachmentName, attachmentData, false, credentials);
+        return createPageWithAttachment(Collections.singletonList(space), page, content, title, syntaxId,
+            parentFullPageName, attachmentName, attachmentData, credentials);
+    }
+
+    /**
+     * @since 7.2M2
+     */
+    public ViewPage createPageWithAttachment(List<String> spaces, String page, String content, String title,
+        String syntaxId, String parentFullPageName, String attachmentName, InputStream attachmentData,
+        UsernamePasswordCredentials credentials) throws Exception
+    {
+        ViewPage vp = createPage(spaces, page, content, title, syntaxId, parentFullPageName);
+        attachFile(spaces, page, attachmentName, attachmentData, false, credentials);
         return vp;
     }
 
@@ -468,6 +732,38 @@ public class TestUtils
     }
 
     /**
+     * @since 7.2M2
+     */
+    public void deletePage(EntityReference reference)
+    {
+        getDriver().get(getURLToDeletePage(reference));
+    }
+
+    /**
+     * @since 7.2M2
+     */
+    public EntityReference resolveDocumentReference(String referenceAsString)
+    {
+        return referenceResolver.resolve(referenceAsString, EntityType.DOCUMENT);
+    }
+
+    /**
+     * @since 7.2M3
+     */
+    public EntityReference resolveSpaceReference(String referenceAsString)
+    {
+        return referenceResolver.resolve(referenceAsString, EntityType.SPACE);
+    }
+
+    /**
+     * @since 7.2RC1
+     */
+    public String serializeReference(EntityReference reference)
+    {
+        return referenceSerializer.serialize(reference);
+    }
+
+    /**
      * Accesses the URL to delete the specified space.
      *
      * @param space the name of the space to delete
@@ -478,17 +774,17 @@ public class TestUtils
         getDriver().get(getURLToDeleteSpace(space));
     }
 
-    public boolean pageExists(String space, String page)
+    public boolean pageExists(String space, String page) throws Exception
     {
-        boolean exists;
-        try {
-            executeGet(getURL(space, page), Status.OK.getStatusCode());
-            exists = true;
-        } catch (Exception e) {
-            exists = false;
-        }
+        return rest().exists(new LocalDocumentReference(space, page));
+    }
 
-        return exists;
+    /**
+     * @since 7.2M2
+     */
+    public boolean pageExists(List<String> spaces, String page) throws Exception
+    {
+        return rest().exists(new LocalDocumentReference(spaces, page));
     }
 
     /**
@@ -524,17 +820,98 @@ public class TestUtils
      */
     public String getURL(String space, String page, String action, String queryString)
     {
-        return getURL(new String[] { space, page }, action, queryString);
+        return getURL(action, new String[] { space, page }, queryString);
     }
 
-    private String getURL(String[] path, String action, String queryString)
+    /**
+     * @since 7.3M1
+     */
+    public String getURL(List<String> spaces, String page)
     {
-        StringBuilder builder = new StringBuilder(TestUtils.BASE_BIN_URL);
+        return getURL(spaces, page, "view", "");
+    }
 
-        builder.append(action);
-        for (String element : path) {
-            builder.append('/').append(escapeURL(element));
+    /**
+     * @since 7.2M2
+     */
+    public String getURL(List<String> spaces, String page, String action, String queryString)
+    {
+        List<String> path = new ArrayList<>(spaces);
+        path.add(page);
+        return getURL(action, path.toArray(new String[] {}), queryString);
+    }
+
+    /**
+     * @since 7.2M2
+     */
+    public String getURL(EntityReference reference, String action, String queryString)
+    {
+        return getURL(action, extractListFromReference(reference).toArray(new String[] {}), queryString);
+    }
+
+    /**
+     * @since 7.2M2
+     */
+    public String getURLFragment(EntityReference reference)
+    {
+        return StringUtils.join(extractListFromReference(reference), "/");
+    }
+
+    private List<String> extractListFromReference(EntityReference reference)
+    {
+        List<String> path = new ArrayList<>();
+        // Add the spaces
+        EntityReference spaceReference = reference.extractReference(EntityType.SPACE);
+        EntityReference wikiReference = reference.extractReference(EntityType.WIKI);
+        for (EntityReference singleReference : spaceReference.removeParent(wikiReference).getReversedReferenceChain()) {
+            path.add(singleReference.getName());
         }
+        if (reference.getType() == EntityType.DOCUMENT) {
+            path.add(reference.getName());
+        }
+        return path;
+    }
+
+    /**
+     * @since 7.3M1
+     */
+    public String getCurrentWiki()
+    {
+        return this.currentWiki;
+    }
+
+    /**
+     * @since 7.3M1
+     */
+    public String getBaseURL()
+    {
+        return XWikiExecutor.URL + ":" + (this.executor != null ? this.executor.getPort() : XWikiExecutor.DEFAULT_PORT)
+            + "/xwiki/";
+    }
+
+    /**
+     * @since 7.3M1
+     */
+    public String getBaseBinURL()
+    {
+        return getBaseURL() + "bin/";
+    }
+
+    /**
+     * @since 7.2M1
+     */
+    public String getURL(String action, String[] path, String queryString)
+    {
+        StringBuilder builder = new StringBuilder(getBaseBinURL());
+
+        if (!StringUtils.isEmpty(action)) {
+            builder.append(action).append('/');
+        }
+        List<String> escapedPath = new ArrayList<>();
+        for (String element : path) {
+            escapedPath.add(escapeURL(element));
+        }
+        builder.append(StringUtils.join(escapedPath, '/'));
 
         boolean needToAddSecretToken = !Arrays.asList("view", "register", "download").contains(action);
         if (needToAddSecretToken || !StringUtils.isEmpty(queryString)) {
@@ -575,7 +952,7 @@ public class TestUtils
      */
     public String getAttachmentURL(String space, String page, String attachment, String action, String queryString)
     {
-        return getURL(new String[] { space, page, attachment }, action, queryString);
+        return getURL(action, new String[] { space, page, attachment }, queryString);
     }
 
     /**
@@ -615,7 +992,14 @@ public class TestUtils
         // which blocks the test.
         String previousURL = getDriver().getCurrentUrl();
         // Go to the registration page because the registration form uses secret token.
-        gotoPage("XWiki", "Register", "register");
+        gotoPage(getCurrentWiki(), "Register", "register");
+        recacheSecretTokenWhenOnRegisterPage();
+        // Return to the previous page.
+        getDriver().get(previousURL);
+    }
+
+    private void recacheSecretTokenWhenOnRegisterPage()
+    {
         try {
             WebElement tokenInput = getDriver().findElement(By.xpath("//input[@name='form_token']"));
             this.secretToken = tokenInput.getAttribute("value");
@@ -624,8 +1008,6 @@ public class TestUtils
             System.out.println("Warning: Failed to cache anti-CSRF secret token, some tests might fail!");
             exception.printStackTrace();
         }
-        // Return to the previous page.
-        getDriver().get(previousURL);
     }
 
     /**
@@ -642,23 +1024,6 @@ public class TestUtils
             return "";
         }
         return this.secretToken;
-    }
-
-    /**
-     * Encodes a given string so that it may be used as a URL component. Compatable with javascript decodeURIComponent,
-     * though more strict than encodeURIComponent: all characters except [a-zA-Z0-9], '.', '-', '*', '_' are converted
-     * to hexadecimal, and spaces are substituted by '+'.
-     *
-     * @param s
-     */
-    public String escapeURL(String s)
-    {
-        try {
-            return URLEncoder.encode(s, "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            // should not happen
-            throw new RuntimeException(e);
-        }
     }
 
     /**
@@ -692,43 +1057,21 @@ public class TestUtils
         }
     }
 
-    public int getTimeout()
-    {
-        return this.timeout;
-    }
-
-    /**
-     * @param timeout the number of seconds after which we consider the action to have failed
-     */
-    public void setTimeout(int timeout)
-    {
-        this.timeout = timeout;
-    }
-
-    /**
-     * Forces the passed driver to wait for a {@link #getTimeout()} number of seconds when looking up page elements
-     * before declaring that it cannot find them.
-     */
-    public void setDriverImplicitWait(WebDriver driver)
-    {
-        driver.manage().timeouts().implicitlyWait(getTimeout(), TimeUnit.SECONDS);
-    }
-
     public boolean isInWYSIWYGEditMode()
     {
-        return getDriver()
-            .findElements(By.xpath("//div[@id='tmCurrentEditor']//a/strong[contains(text(), 'WYSIWYG')]")).size() > 0;
+        return getDriver().findElements(By.xpath("//div[@id='editcolumn' and contains(@class, 'editor-wysiwyg')]"))
+            .size() > 0;
     }
 
     public boolean isInWikiEditMode()
     {
-        return getDriver().findElements(By.xpath("//div[@id='tmCurrentEditor']//a/strong[contains(text(), 'Wiki')]"))
+        return getDriver().findElements(By.xpath("//div[@id='editcolumn' and contains(@class, 'editor-wiki')]"))
             .size() > 0;
     }
 
     public boolean isInViewMode()
     {
-        return getDriver().findElements(By.id("tmEdit")).size() > 0;
+        return !getDriver().hasElementWithoutWaiting(By.id("editMeta"));
     }
 
     public boolean isInSourceViewMode()
@@ -773,6 +1116,11 @@ public class TestUtils
         return getDriver().getCurrentUrl().contains("/create/");
     }
 
+    public boolean isInAdminMode()
+    {
+        return getDriver().getCurrentUrl().contains("/admin/");
+    }
+
     /**
      * Forces the current user to be the Guest user by clearing all coookies.
      */
@@ -786,22 +1134,32 @@ public class TestUtils
         gotoPage(space, page, "objectadd", toQueryParameters(className, null, properties));
     }
 
+    /**
+     * @since 7.2RC1
+     */
+    public void addObject(EntityReference reference, String className, Object... properties)
+    {
+        gotoPage(reference, "objectadd", toQueryParameters(className, null, properties));
+    }
+
+    /**
+     * @since 7.3M2
+     */
+    public void addObject(EntityReference reference, String className, Map<String, ?> properties)
+    {
+        gotoPage(reference, "objectadd", toQueryParameters(className, null, properties));
+    }
+
     public void addObject(String space, String page, String className, Map<String, ?> properties)
     {
         gotoPage(space, page, "objectadd", toQueryParameters(className, null, properties));
     }
 
-    public void deleteObject(String space, String page, String className, int objectNumber)
+    public void deleteObject(String space, String page, String className, int objectNumber) throws Exception
     {
-        StringBuilder queryString = new StringBuilder();
-
-        queryString.append("classname=");
-        queryString.append(escapeURL(className));
-        queryString.append('&');
-        queryString.append("classid=");
-        queryString.append(objectNumber);
-
-        gotoPage(space, page, "objectremove", queryString.toString());
+        TestUtils.assertStatusCodes(
+            rest().executeDelete(ObjectResource.class, getCurrentWiki(), space, page, className, objectNumber), true,
+            STATUS_NO_CONTENT);
     }
 
     public void updateObject(String space, String page, String className, int objectNumber, Map<String, ?> properties)
@@ -812,13 +1170,18 @@ public class TestUtils
     public void updateObject(String space, String page, String className, int objectNumber, Object... properties)
     {
         // TODO: would be even quicker using REST
-        gotoPage(space, page, "save", toQueryParameters(className, objectNumber, properties));
+        Map<String, Object> queryParameters =
+            (Map<String, Object>) toQueryParameters(className, objectNumber, properties);
+
+        // Append the updateOrCreate objectPolicy since we always want this in our tests.
+        queryParameters.put("objectPolicy", "updateOrCreate");
+
+        gotoPage(space, page, "save", queryParameters);
     }
 
-    public ClassEditPage addClassProperty(String space, String page, String propertyName, String propertyType)
+    public void addClassProperty(String space, String page, String propertyName, String propertyType)
     {
         gotoPage(space, page, "propadd", "propname", propertyName, "proptype", propertyType);
-        return new ClassEditPage();
     }
 
     /**
@@ -885,7 +1248,7 @@ public class TestUtils
 
     public Map<String, ?> toQueryParameters(String className, Integer objectNumber, Object... properties)
     {
-        Map<String, Object> queryParameters = new HashMap<String, Object>();
+        Map<String, Object> queryParameters = new HashMap<>();
 
         queryParameters.put("classname", className);
 
@@ -900,7 +1263,7 @@ public class TestUtils
 
     public Map<String, ?> toQueryParameters(String className, Integer objectNumber, Map<String, ?> properties)
     {
-        Map<String, Object> queryParameters = new HashMap<String, Object>();
+        Map<String, Object> queryParameters = new HashMap<>();
 
         if (className != null) {
             queryParameters.put("classname", className);
@@ -933,76 +1296,6 @@ public class TestUtils
         }
     }
 
-    public WebElement findElementWithoutWaiting(WebDriver driver, By by)
-    {
-        // Temporarily remove the implicit wait on the driver since we're doing our own waits...
-        driver.manage().timeouts().implicitlyWait(0, TimeUnit.SECONDS);
-        try {
-            return driver.findElement(by);
-        } finally {
-            setDriverImplicitWait(driver);
-        }
-    }
-
-    public List<WebElement> findElementsWithoutWaiting(WebDriver driver, By by)
-    {
-        // Temporarily remove the implicit wait on the driver since we're doing our own waits...
-        driver.manage().timeouts().implicitlyWait(0, TimeUnit.SECONDS);
-        try {
-            return driver.findElements(by);
-        } finally {
-            setDriverImplicitWait(driver);
-        }
-    }
-
-    public WebElement findElementWithoutWaiting(WebDriver driver, WebElement element, By by)
-    {
-        // Temporarily remove the implicit wait on the driver since we're doing our own waits...
-        driver.manage().timeouts().implicitlyWait(0, TimeUnit.SECONDS);
-        try {
-            return element.findElement(by);
-        } finally {
-            setDriverImplicitWait(driver);
-        }
-    }
-
-    public List<WebElement> findElementsWithoutWaiting(WebDriver driver, WebElement element, By by)
-    {
-        // Temporarily remove the implicit wait on the driver since we're doing our own waits...
-        driver.manage().timeouts().implicitlyWait(0, TimeUnit.SECONDS);
-        try {
-            return element.findElements(by);
-        } finally {
-            setDriverImplicitWait(driver);
-        }
-    }
-
-    /**
-     * Should be used when the result is supposed to be true (otherwise you'll incur the timeout).
-     */
-    public boolean hasElement(By by)
-    {
-        try {
-            getDriver().findElement(by);
-            return true;
-        } catch (NoSuchElementException e) {
-            return false;
-        }
-    }
-
-    /**
-     * Should be used when the result is supposed to be true (otherwise you'll incur the timeout).
-     */
-    public boolean hasElement(WebElement element, By by)
-    {
-        try {
-            element.findElement(by);
-            return true;
-        } catch (NoSuchElementException e) {
-            return false;
-        }
-    }
-
     public ObjectEditPage editObjects(String space, String page)
     {
         gotoPage(space, page, "edit", "editor=object");
@@ -1017,7 +1310,7 @@ public class TestUtils
 
     public String getVersion() throws Exception
     {
-        Xwiki xwiki = getRESTResource("", null);
+        Xwiki xwiki = rest().getResource("", null);
 
         return xwiki.getVersion();
     }
@@ -1050,34 +1343,72 @@ public class TestUtils
     public void attachFile(String space, String page, String name, InputStream is, boolean failIfExists,
         UsernamePasswordCredentials credentials) throws Exception
     {
-        if (credentials != null) {
-            this.adminHTTPClient.getState().setCredentials(AuthScope.ANY, credentials);
+        attachFile(Collections.singletonList(space), page, name, is, failIfExists, credentials);
+    }
+
+    /**
+     * @since 7.2M2
+     */
+    public void attachFile(List<String> spaces, String page, String name, InputStream is, boolean failIfExists,
+        UsernamePasswordCredentials credentials) throws Exception
+    {
+        UsernamePasswordCredentials currentCredentials = getDefaultCredentials();
+
+        try {
+            if (credentials != null) {
+                setDefaultCredentials(credentials);
+            }
+            attachFile(spaces, page, name, is, failIfExists);
+        } finally {
+            setDefaultCredentials(currentCredentials);
         }
-        attachFile(space, page, name, is, failIfExists);
     }
 
     public void attachFile(String space, String page, String name, InputStream is, boolean failIfExists)
         throws Exception
     {
-        // make sure xwiki.Import exists
-        if (!pageExists(space, page)) {
-            createPage(space, page, null, null);
+        attachFile(Collections.singletonList(space), page, name, is, failIfExists);
+    }
+
+    /**
+     * @since 7.2M2
+     */
+    public void attachFile(List<String> spaces, String page, String name, InputStream is, boolean failIfExists)
+        throws Exception
+    {
+        AttachmentReference reference =
+            new AttachmentReference(name, new DocumentReference(getCurrentWiki(), spaces, page));
+
+        attachFile(reference, is, failIfExists);
+    }
+
+    /**
+     * @since 7.3M1
+     */
+    public void attachFile(EntityReference pageReference, String name, InputStream is, boolean failIfExists)
+        throws Exception
+    {
+        EntityReference reference = new EntityReference(name, EntityType.ATTACHMENT, pageReference);
+
+        attachFile(reference, is, failIfExists);
+    }
+
+    /**
+     * @since 7.3M1
+     */
+    public void attachFile(EntityReference reference, InputStream is, boolean failIfExists) throws Exception
+    {
+        // make sure the page exist
+        if (!rest().exists(reference.getParent())) {
+            rest().savePage(reference.getParent());
         }
 
-        StringBuilder url = new StringBuilder(BASE_REST_URL);
-
-        url.append("wikis/xwiki/spaces/");
-        url.append(escapeURL(space));
-        url.append("/pages/");
-        url.append(escapeURL(page));
-        url.append("/attachments/");
-        url.append(escapeURL(name));
-
         if (failIfExists) {
-            executePut(url.toString(), is, MediaType.APPLICATION_OCTET_STREAM, Status.CREATED.getStatusCode());
+            assertStatusCodes(rest().executePut(AttachmentResource.class, is, rest().toElements(reference)), true,
+                STATUS_CREATED);
         } else {
-            executePut(url.toString(), is, MediaType.APPLICATION_OCTET_STREAM, Status.CREATED.getStatusCode(),
-                Status.ACCEPTED.getStatusCode());
+            assertStatusCodes(rest().executePut(AttachmentResource.class, is, rest().toElements(reference)), true,
+                STATUS_CREATED_ACCEPTED);
         }
     }
 
@@ -1089,20 +1420,198 @@ public class TestUtils
 
         // import file
         executeGet(
-            BASE_BIN_URL + "import/XWiki/Import?historyStrategy=add&importAsBackup=true&ajax&action=import&name="
-                + escapeURL(file.getName()), Status.OK.getStatusCode());
+            getBaseBinURL() + "import/XWiki/Import?historyStrategy=add&importAsBackup=true&ajax&action=import&name="
+                + escapeURL(file.getName()),
+            Status.OK.getStatusCode());
     }
 
-    public InputStream getRESTInputStream(String resourceUri, Map<String, Object[]> queryParams, Object... elements)
+    /**
+     * Delete the latest version from the history of a page, using the {@code /deleteversions/} action.
+     *
+     * @param space the space name of the page
+     * @param page the name of the page
+     * @since 7.0M2
+     */
+    public void deleteLatestVersion(String space, String page)
+    {
+        deleteVersion(space, page, "latest");
+    }
+
+    /**
+     * Delete a specific version from the history of a page, using the {@code /deleteversions/} action.
+     *
+     * @param space the space name of the page
+     * @param page the name of the page
+     * @param version the version to delete
+     * @since 7.0M2
+     */
+    public void deleteVersion(String space, String page, String version)
+    {
+        deleteVersions(space, page, version, version);
+    }
+
+    /**
+     * Delete an interval of versions from the history of a page, using the {@code /deleteversions/} action.
+     *
+     * @param space the space name of the page
+     * @param page the name of the page
+     * @param v1 the starting version to delete
+     * @param v2 the ending version to delete
+     * @since 7.0M2
+     */
+    public void deleteVersions(String space, String page, String v1, String v2)
+    {
+        gotoPage(space, page, "deleteversions", "rev1", v1, "rev2", v2, "confirm", "1");
+    }
+
+    /**
+     * Roll back a page to the previous version, using the {@code /rollback/} action.
+     *
+     * @param space the space name of the page
+     * @param page the name of the page
+     * @since 7.0M2
+     */
+    public void rollbackToPreviousVersion(String space, String page)
+    {
+        rollBackTo(space, page, "previous");
+    }
+
+    /**
+     * Roll back a page to the specified version, using the {@code /rollback/} action.
+     *
+     * @param space the space name of the page
+     * @param page the name of the page
+     * @param version the version to rollback to
+     * @since 7.0M2
+     */
+    public void rollBackTo(String space, String page, String version)
+    {
+        gotoPage(space, page, "rollback", "rev", version, "confirm", "1");
+    }
+
+    /**
+     * Set the hierarchy mode used in the wiki
+     *
+     * @param mode the mode to use ("reference" or "parentchild")
+     * @since 7.2M2
+     */
+    public void setHierarchyMode(String mode)
+    {
+        setPropertyInXWikiPreferences("core.hierarchyMode", "String", mode);
+    }
+
+    /**
+     * Add and set a property into XWiki.XWikiPreferences. Create XWiki.XWikiPreferences if it does not exist.
+     *
+     * @param propertyName name of the property to set
+     * @param propertyType the type of the property to add
+     * @param value value to set to the property
+     * @since 7.2M2
+     */
+    public void setPropertyInXWikiPreferences(String propertyName, String propertyType, Object value)
+    {
+        addClassProperty("XWiki", "XWikiPreferences", propertyName, propertyType);
+        gotoPage("XWiki", "XWikiPreferences", "edit", "editor", "object");
+        ObjectEditPage objectEditPage = new ObjectEditPage();
+        if (objectEditPage.hasObject("XWiki.XWikiPreferences")) {
+            updateObject("XWiki", "XWikiPreferences", "XWiki.XWikiPreferences", 0, propertyName, value);
+        } else {
+            addObject("XWiki", "XWikiPreferences", "XWiki.XWikiPreferences", propertyName, value);
+        }
+    }
+
+    /**
+     * @since 7.3M1
+     */
+    public static void assertStatuses(int actualCode, int... expectedCodes)
+    {
+        if (!ArrayUtils.contains(expectedCodes, actualCode)) {
+            Assert.fail(
+                "Unexpected code [" + actualCode + "], was expecting one of [" + Arrays.toString(expectedCodes) + "]");
+        }
+    }
+
+    /**
+     * @since 7.3M1
+     */
+    public static <M extends HttpMethod> M assertStatusCodes(M method, boolean release, int... expectedCodes)
+    {
+        if (expectedCodes.length > 0) {
+            assertStatuses(method.getStatusCode(), expectedCodes);
+        }
+
+        if (release) {
+            method.releaseConnection();
+        }
+
+        return method;
+    }
+
+    // HTTP
+
+    /**
+     * Encodes a given string so that it may be used as a URL component. Compatable with javascript decodeURIComponent,
+     * though more strict than encodeURIComponent: all characters except [a-zA-Z0-9], '.', '-', '*', '_' are converted
+     * to hexadecimal, and spaces are substituted by '+'.
+     *
+     * @param s
+     */
+    public String escapeURL(String s)
+    {
+        try {
+            return URLEncoder.encode(s, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            // should not happen
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Usage example:
+     *
+     * <pre>
+     * {@code
+     * By.xpath("//a[. = " + escapeXPath(value) + "]")
+     * }
+     * </pre>
+     *
+     * @param value the value to escape
+     * @return the escaped value
+     */
+    public String escapeXPath(String value)
+    {
+        return "concat('" + value.replace("'", "', \"'\", '") + "', '')";
+    }
+
+    public InputStream getInputStream(String path, Map<String, ?> queryParams) throws Exception
+    {
+        return getInputStream(getBaseURL(), path, queryParams);
+    }
+
+    public String getString(String path, Map<String, ?> queryParams) throws Exception
+    {
+        try (InputStream inputStream = getInputStream(getBaseURL(), path, queryParams)) {
+            return IOUtils.toString(inputStream);
+        }
+    }
+
+    public InputStream getInputStream(String prefix, String path, Map<String, ?> queryParams, Object... elements)
         throws Exception
     {
-        UriBuilder builder =
-            UriBuilder.fromUri(BASE_REST_URL.substring(0, BASE_REST_URL.length() - 1)).path(
-                !resourceUri.isEmpty() && resourceUri.charAt(0) == '/' ? resourceUri.substring(1) : resourceUri);
+        String cleanPrefix = prefix.endsWith("/") ? prefix.substring(0, prefix.length() - 1) : prefix;
+        if (path.startsWith(cleanPrefix)) {
+            cleanPrefix = "";
+        }
+
+        UriBuilder builder = UriBuilder.fromUri(cleanPrefix).path(path.startsWith("/") ? path.substring(1) : path);
 
         if (queryParams != null) {
-            for (Map.Entry<String, Object[]> entry : queryParams.entrySet()) {
-                builder.queryParam(entry.getKey(), entry.getValue());
+            for (Map.Entry<String, ?> entry : queryParams.entrySet()) {
+                if (entry.getValue() instanceof Object[]) {
+                    builder.queryParam(entry.getKey(), (Object[]) entry.getValue());
+                } else {
+                    builder.queryParam(entry.getKey(), entry.getValue());
+                }
             }
         }
 
@@ -1111,56 +1620,679 @@ public class TestUtils
         return executeGet(url, Status.OK.getStatusCode()).getResponseBodyAsStream();
     }
 
-    public byte[] getRESTBuffer(String resourceUri, Map<String, Object[]> queryParams, Object... elements)
-        throws Exception
-    {
-        InputStream is = getRESTInputStream(resourceUri, queryParams, elements);
-
-        byte[] buffer;
-        try {
-            buffer = IOUtils.toByteArray(is);
-        } finally {
-            is.close();
-        }
-
-        return buffer;
-    }
-
-    public <T> T getRESTResource(String resourceUri, Map<String, Object[]> queryParams, Object... elements)
-        throws Exception
-    {
-        T resource;
-        try (InputStream is = getRESTInputStream(resourceUri, queryParams, elements)) {
-            resource = (T) unmarshaller.unmarshal(is);
-        }
-
-        return resource;
-    }
-
-    protected GetMethod executeGet(String uri, int expectedCode) throws Exception
+    protected GetMethod executeGet(String uri) throws Exception
     {
         GetMethod getMethod = new GetMethod(uri);
 
-        int code = this.adminHTTPClient.executeMethod(getMethod);
-        if (code != expectedCode) {
-            throw new Exception("Failed to execute get [" + uri + "] with code [" + code + "]");
-        }
+        this.httpClient.executeMethod(getMethod);
 
         return getMethod;
     }
 
-    protected PutMethod executePut(String uri, InputStream content, String mediaType, int... expectedCodes)
+    protected GetMethod executeGet(String uri, int... expectedCodes) throws Exception
+    {
+        return executeGet(uri, false, expectedCodes);
+    }
+
+    /**
+     * @since 7.3M1
+     */
+    protected GetMethod executeGet(String uri, boolean release, int... expectedCodes) throws Exception
+    {
+        return assertStatusCodes(executeGet(uri), release, expectedCodes);
+    }
+
+    /**
+     * @since 7.3M1
+     */
+    protected PostMethod executePost(String uri, InputStream content, String mediaType) throws Exception
+    {
+        PostMethod postMethod = new PostMethod(uri);
+        RequestEntity entity = new InputStreamRequestEntity(content, mediaType);
+        postMethod.setRequestEntity(entity);
+
+        this.httpClient.executeMethod(postMethod);
+
+        return postMethod;
+    }
+
+    protected PostMethod executePost(String uri, InputStream content, String mediaType, int... expectedCodes)
         throws Exception
+    {
+        return executePost(uri, content, mediaType, true, expectedCodes);
+    }
+
+    /**
+     * @since 7.3M1
+     */
+    protected PostMethod executePost(String uri, InputStream content, String mediaType, boolean release,
+        int... expectedCodes) throws Exception
+    {
+        return assertStatusCodes(executePost(uri, content, mediaType), false, expectedCodes);
+    }
+
+    /**
+     * @since 7.3M1
+     */
+    protected DeleteMethod executeDelete(String uri) throws Exception
+    {
+        DeleteMethod postMethod = new DeleteMethod(uri);
+
+        this.httpClient.executeMethod(postMethod);
+
+        return postMethod;
+    }
+
+    /**
+     * @since 7.3M1
+     */
+    protected void executeDelete(String uri, int... expectedCodes) throws Exception
+    {
+        assertStatusCodes(executeDelete(uri), true, expectedCodes);
+    }
+
+    /**
+     * @since 7.3M1
+     */
+    protected PutMethod executePut(String uri, InputStream content, String mediaType) throws Exception
     {
         PutMethod putMethod = new PutMethod(uri);
         RequestEntity entity = new InputStreamRequestEntity(content, mediaType);
         putMethod.setRequestEntity(entity);
 
-        int code = this.adminHTTPClient.executeMethod(putMethod);
-        if (!ArrayUtils.contains(expectedCodes, code)) {
-            throw new Exception("Failed to execute put [" + uri + "] with code [" + code + "]");
-        }
+        this.httpClient.executeMethod(putMethod);
 
         return putMethod;
+    }
+
+    protected void executePut(String uri, InputStream content, String mediaType, int... expectedCodes) throws Exception
+    {
+        executePut(uri, content, mediaType, true, expectedCodes);
+    }
+
+    protected PutMethod executePut(String uri, InputStream content, String mediaType, boolean release,
+        int... expectedCodes) throws Exception
+    {
+        return assertStatusCodes(executePut(uri, content, mediaType), release, expectedCodes);
+    }
+
+    // REST
+
+    public RestTestUtils rest()
+    {
+        return this.rest;
+    }
+
+    /**
+     * @since 7.3M1
+     */
+    public static class RestTestUtils
+    {
+        public static final Boolean ELEMENTS_ENCODED = new Boolean(true);
+
+        public static final Map<EntityType, Class<?>> RESOURCES_MAP = new IdentityHashMap<>();
+
+        /**
+         * Used to match number part of the object reference name.
+         */
+        private static final Pattern OBJECT_NAME_PATTERN = Pattern.compile("(\\\\*)\\[(\\d*)\\]$");
+
+        static {
+            try {
+                // Initialize REST related tools
+                JAXBContext jaxbContext = JAXBContext
+                    .newInstance("org.xwiki.rest.model.jaxb:org.xwiki.extension.repository.xwiki.model.jaxb");
+                marshaller = jaxbContext.createMarshaller();
+                unmarshaller = jaxbContext.createUnmarshaller();
+            } catch (JAXBException e) {
+                throw new RuntimeException(e);
+            }
+
+            RESOURCES_MAP.put(EntityType.DOCUMENT, PageResource.class);
+            RESOURCES_MAP.put(EntityType.ATTACHMENT, AttachmentResource.class);
+            RESOURCES_MAP.put(EntityType.OBJECT, ObjectResource.class);
+            RESOURCES_MAP.put(EntityType.OBJECT_PROPERTY, ObjectPropertyResource.class);
+            RESOURCES_MAP.put(EntityType.CLASS_PROPERTY, ClassPropertyResource.class);
+        }
+
+        /**
+         * @since 7.3M1
+         */
+        public static org.xwiki.rest.model.jaxb.Object object(String className)
+        {
+            org.xwiki.rest.model.jaxb.Object obj = new org.xwiki.rest.model.jaxb.Object();
+
+            obj.setClassName(className);
+
+            return obj;
+        }
+
+        /**
+         * @since 7.3M1
+         */
+        public static String toPropertyString(Object value)
+        {
+            String stringValue;
+
+            if (value instanceof Iterable) {
+                StringBuilder builder = new StringBuilder();
+                for (Object item : (Iterable) value) {
+                    if (builder.length() > 0) {
+                        builder.append('|');
+                    }
+
+                    builder.append(item);
+                }
+
+                stringValue = builder.toString();
+            } else if (value != null) {
+                stringValue = value.toString();
+            } else {
+                stringValue = null;
+            }
+
+            return stringValue;
+        }
+
+        /**
+         * @since 7.3M1
+         */
+        public static Property property(String name, Object value)
+        {
+            Property property = new Property();
+
+            property.setName(name);
+            property.setValue(toPropertyString(value));
+
+            return property;
+        }
+
+        private TestUtils testUtils;
+
+        public RestTestUtils(TestUtils testUtils)
+        {
+            this.testUtils = testUtils;
+        }
+
+        public String getBaseURL()
+        {
+            return this.testUtils.getBaseURL() + "rest";
+        }
+
+        private String toSpaceElement(Iterable<?> spaces)
+        {
+            StringBuilder builder = new StringBuilder();
+
+            for (Object space : spaces) {
+                if (builder.length() > 0) {
+                    builder.append("/spaces/");
+                }
+
+                if (space instanceof EntityReference) {
+                    builder.append(((EntityReference) space).getName());
+                } else {
+                    builder.append(space.toString());
+                }
+            }
+
+            return builder.toString();
+        }
+
+        private String toSpaceElement(String spaceReference)
+        {
+            return toSpaceElement(
+                RELATIVE_RESOLVER.resolve(spaceReference, EntityType.SPACE).getReversedReferenceChain());
+        }
+
+        protected Object[] toElements(Page page)
+        {
+            List<Object> elements = new ArrayList<>();
+
+            // Add wiki
+            if (page.getWiki() != null) {
+                elements.add(page.getWiki());
+            } else {
+                elements.add(this.testUtils.getCurrentWiki());
+            }
+
+            // Add spaces
+            elements.add(toSpaceElement(page.getSpace()));
+
+            // Add name
+            elements.add(page.getName());
+
+            return elements.toArray();
+        }
+
+        public Object[] toElements(org.xwiki.rest.model.jaxb.Object obj, boolean onlyDocument)
+        {
+            List<Object> elements = new ArrayList<>();
+
+            // Add wiki
+            if (obj.getWiki() != null) {
+                elements.add(obj.getWiki());
+            } else {
+                elements.add(this.testUtils.getCurrentWiki());
+            }
+
+            // Add spaces
+            elements.add(toSpaceElement(obj.getSpace()));
+
+            // Add name
+            elements.add(obj.getPageName());
+
+            if (!onlyDocument) {
+                // Add class
+                elements.add(obj.getClassName());
+
+                // Add number
+                elements.add(obj.getNumber());
+            }
+
+            return elements.toArray();
+        }
+
+        public Object[] toElements(EntityReference reference)
+        {
+            List<EntityReference> references = reference.getReversedReferenceChain();
+
+            List<Object> elements = new ArrayList<>(references.size() + 2);
+
+            // Indicate that elements are already encoded
+            elements.add(ELEMENTS_ENCODED);
+
+            // Add current wiki if the reference does not contains any
+            if (reference.extractReference(EntityType.WIKI) == null) {
+                elements.add(this.testUtils.escapeURL(this.testUtils.getCurrentWiki()));
+            }
+
+            // Add reference
+            for (EntityReference ref : references) {
+                if (ref.getType() == EntityType.SPACE) {
+                    // The URI builder does not support multiple elements like space reference so we hack it by doing
+                    // the opposite of what is done when reading the URL (generate a value looking like
+                    // "space1/spaces/space2")
+                    Object value = elements.get(elements.size() - 1);
+
+                    StringBuilder builder;
+                    if (value instanceof StringBuilder) {
+                        builder = (StringBuilder) value;
+                        builder.append("/spaces/");
+                    } else {
+                        builder = new StringBuilder();
+                        elements.add(builder);
+                    }
+
+                    builder.append(this.testUtils.escapeURL(ref.getName()));
+                } else if (ref.getType() == EntityType.OBJECT) {
+                    // The REST API is no in sync with the ObjectReference structure:
+                    // was is a unique name in ObjectReference is two separated class name and index in REST API
+                    String classReferenceStr;
+                    String objectNumberStr;
+
+                    Matcher matcher = OBJECT_NAME_PATTERN.matcher(ref.getName());
+                    if (matcher.find()) {
+                        if (matcher.group(1).length() % 2 == 0) {
+                            classReferenceStr = ref.getName().substring(0, matcher.end(1));
+                            objectNumberStr = matcher.group(2);
+                        } else {
+                            classReferenceStr = ref.getName();
+                            objectNumberStr = null;
+                        }
+                    } else {
+                        classReferenceStr = ref.getName();
+                        objectNumberStr = null;
+                    }
+
+                    elements.add(classReferenceStr);
+                    elements.add(objectNumberStr);
+                } else {
+                    elements.add(this.testUtils.escapeURL(ref.getName()));
+                }
+            }
+
+            return elements.toArray();
+        }
+
+        /**
+         * Add or update.
+         */
+        public void save(Page page, int... expectedCodes) throws Exception
+        {
+            save(page, true, expectedCodes);
+        }
+
+        public EntityEnclosingMethod save(Page page, boolean release, int... expectedCodes) throws Exception
+        {
+            if (expectedCodes.length == 0) {
+                // Allow create or modify by default
+                expectedCodes = STATUS_CREATED_ACCEPTED;
+            }
+
+            return TestUtils.assertStatusCodes(executePut(PageResource.class, page, toElements(page)), release,
+                expectedCodes);
+        }
+
+        /**
+         * @since 7.3M1
+         */
+        public Page page(EntityReference reference)
+        {
+            Page page = new Page();
+
+            // Add current wiki if the reference does not contains any
+            EntityReference wikiReference = reference.extractReference(EntityType.WIKI);
+            if (wikiReference == null) {
+                page.setWiki(this.testUtils.getCurrentWiki());
+            } else {
+                page.setWiki(wikiReference.getName());
+            }
+
+            // Add spaces
+            EntityReference spaceReference = reference.extractReference(EntityType.SPACE).removeParent(wikiReference);
+            page.setSpace(SERIALIZER.serialize(spaceReference));
+
+            // Add page
+            EntityReference documentReference = reference.extractReference(EntityType.DOCUMENT);
+            page.setName(documentReference.getName());
+
+            return page;
+        }
+
+        /**
+         * @since 7.3M1
+         */
+        public void savePage(EntityReference reference) throws Exception
+        {
+            savePage(reference, null, null, null, null);
+        }
+
+        /**
+         * @since 7.3M1
+         */
+        public void savePage(EntityReference reference, String content, String title) throws Exception
+        {
+            savePage(reference, content, null, title, null);
+        }
+
+        /**
+         * @since 7.3M1
+         */
+        public void savePage(EntityReference reference, String content, String syntaxId, String title,
+            String parentFullPageName) throws Exception
+        {
+            Page page = page(reference);
+
+            if (content != null) {
+                page.setContent(content);
+            }
+            if (title != null) {
+                page.setTitle(title);
+            }
+            if (syntaxId != null) {
+                page.setSyntax(syntaxId);
+            }
+            if (parentFullPageName != null) {
+                page.setParent(parentFullPageName);
+            }
+
+            save(page, true);
+        }
+
+        /**
+         * Add a new object.
+         */
+        public void add(org.xwiki.rest.model.jaxb.Object obj) throws Exception
+        {
+            add(obj, true);
+        }
+
+        /**
+         * Add a new object.
+         */
+        public EntityEnclosingMethod add(org.xwiki.rest.model.jaxb.Object obj, boolean release) throws Exception
+        {
+            return TestUtils.assertStatusCodes(executePost(ObjectsResource.class, obj, toElements(obj, true)), release,
+                STATUS_CREATED);
+        }
+
+        /**
+         * Fail if the object does not exist.
+         */
+        public void update(org.xwiki.rest.model.jaxb.Object obj) throws Exception
+        {
+            update(obj, true);
+        }
+
+        /**
+         * Fail if the object does not exist.
+         */
+        public EntityEnclosingMethod update(org.xwiki.rest.model.jaxb.Object obj, boolean release) throws Exception
+        {
+            return TestUtils.assertStatusCodes(executePut(ObjectResource.class, obj, toElements(obj, false)), release,
+                STATUS_CREATED_ACCEPTED);
+        }
+
+        public void delete(EntityReference reference) throws Exception
+        {
+            Class<?> resource = RESOURCES_MAP.get(reference.getType());
+
+            if (resource == null) {
+                throw new Exception("Unsuported type [" + reference.getType() + "]");
+            }
+
+            TestUtils.assertStatusCodes(executeDelete(resource, toElements(reference)), true, STATUS_NO_CONTENT);
+        }
+
+        public void deletePage(String space, String page) throws Exception
+        {
+            delete(new LocalDocumentReference(space, page));
+        }
+
+        public boolean exists(EntityReference reference) throws Exception
+        {
+            GetMethod getMethod = executeGet(reference);
+
+            getMethod.releaseConnection();
+
+            return getMethod.getStatusCode() == Status.OK.getStatusCode();
+        }
+
+        /**
+         * @since 7.3
+         */
+        public <T> T get(EntityReference reference) throws Exception
+        {
+            GetMethod getMethod = assertStatusCodes(executeGet(reference), false, STATUS_OK);
+
+            try {
+                try (InputStream stream = getMethod.getResponseBodyAsStream()) {
+                    return toResource(stream);
+                }
+            } finally {
+                getMethod.releaseConnection();
+            }
+        }
+
+        public InputStream getInputStream(String resourceUri, Map<String, ?> queryParams, Object... elements)
+            throws Exception
+        {
+            return this.testUtils.getInputStream(getBaseURL(), resourceUri, queryParams, elements);
+        }
+
+        public InputStream postRESTInputStream(Object resourceUri, Object restObject, Object... elements)
+            throws Exception
+        {
+            return postInputStream(resourceUri, restObject, Collections.<String, Object[]>emptyMap(), elements);
+        }
+
+        public InputStream postInputStream(Object resourceUri, Object restObject, Map<String, Object[]> queryParams,
+            Object... elements) throws Exception
+        {
+            return executePost(resourceUri, restObject, queryParams, elements).getResponseBodyAsStream();
+        }
+
+        public <T> T toResource(InputStream is) throws JAXBException
+        {
+            return (T) unmarshaller.unmarshal(is);
+        }
+
+        protected InputStream toResourceInputStream(Object restObject) throws JAXBException
+        {
+            InputStream resourceStream;
+            if (restObject instanceof InputStream) {
+                resourceStream = (InputStream) restObject;
+            } else {
+                ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                marshaller.marshal(restObject, stream);
+                resourceStream = new ByteArrayInputStream(stream.toByteArray());
+            }
+
+            return resourceStream;
+        }
+
+        /**
+         * @since 7.3
+         */
+        public GetMethod executeGet(EntityReference reference) throws Exception
+        {
+            Class<?> resource = RESOURCES_MAP.get(reference.getType());
+
+            if (resource == null) {
+                throw new Exception("Unsuported type [" + reference.getType() + "]");
+            }
+
+            return executeGet(resource, toElements(reference));
+        }
+
+        public GetMethod executeGet(Object resourceUri, Object... elements) throws Exception
+        {
+            return executeGet(resourceUri, Collections.<String, Object[]>emptyMap(), elements);
+        }
+
+        public GetMethod executeGet(Object resourceUri, Map<String, Object[]> queryParams, Object... elements)
+            throws Exception
+        {
+            // Build URI
+            String uri = createUri(resourceUri, queryParams, elements).toString();
+
+            return this.testUtils.executeGet(uri);
+        }
+
+        public PostMethod executePost(Object resourceUri, Object restObject, Object... elements) throws Exception
+        {
+            return executePost(resourceUri, restObject, Collections.<String, Object[]>emptyMap(), elements);
+        }
+
+        public PostMethod executePost(Object resourceUri, Object restObject, Map<String, Object[]> queryParams,
+            Object... elements) throws Exception
+        {
+            // Build URI
+            String uri = createUri(resourceUri, queryParams, elements).toString();
+
+            try (InputStream resourceStream = toResourceInputStream(restObject)) {
+                return this.testUtils.executePost(uri, resourceStream, MediaType.APPLICATION_XML);
+            }
+        }
+
+        public PutMethod executePut(Object resourceUri, Object restObject, Object... elements) throws Exception
+        {
+            return executePut(resourceUri, restObject, Collections.<String, Object[]>emptyMap(), elements);
+        }
+
+        public PutMethod executePut(Object resourceUri, Object restObject, Map<String, Object[]> queryParams,
+            Object... elements) throws Exception
+        {
+            // Build URI
+            String uri = createUri(resourceUri, queryParams, elements).toString();
+
+            try (InputStream resourceStream = toResourceInputStream(restObject)) {
+                return this.testUtils.executePut(uri, resourceStream, MediaType.APPLICATION_XML);
+            }
+        }
+
+        public DeleteMethod executeDelete(Object resourceUri, Object... elements) throws Exception
+        {
+            return executeDelete(resourceUri, Collections.<String, Object[]>emptyMap(), elements);
+        }
+
+        public DeleteMethod executeDelete(Object resourceUri, Map<String, Object[]> queryParams, Object... elements)
+            throws Exception
+        {
+            // Build URI
+            String uri = createUri(resourceUri, queryParams, elements).toString();
+
+            return this.testUtils.executeDelete(uri);
+        }
+
+        public URI createUri(Object resourceUri, Map<String, Object[]> queryParams, Object... elements)
+        {
+            // Create URI builder
+            UriBuilder builder = getUriBuilder(resourceUri, queryParams);
+
+            // Build URI
+            URI uri;
+            if (elements.length > 0 && elements[0] == ELEMENTS_ENCODED) {
+                uri = builder.buildFromEncoded(Arrays.copyOfRange(elements, 1, elements.length));
+            } else {
+                uri = builder.build(elements);
+            }
+
+            return uri;
+        }
+
+        public UriBuilder getUriBuilder(Object resourceUri, Map<String, Object[]> queryParams)
+        {
+            // Create URI builder
+            UriBuilder builder;
+            if (resourceUri instanceof Class) {
+                builder = getUriBuilder((Class) resourceUri);
+            } else {
+                String stringResourceUri = (String) resourceUri;
+                builder = UriBuilder.fromUri(getBaseURL().substring(0, getBaseURL().length() - 1))
+                    .path(!stringResourceUri.isEmpty() && stringResourceUri.charAt(0) == '/'
+                        ? stringResourceUri.substring(1) : stringResourceUri);
+            }
+
+            // Add query parameters
+            if (queryParams != null) {
+                for (Map.Entry<String, Object[]> entry : queryParams.entrySet()) {
+                    builder.queryParam(entry.getKey(), entry.getValue());
+                }
+            }
+
+            return builder;
+        }
+
+        protected UriBuilder getUriBuilder(Class<?> resource)
+        {
+            return UriBuilder.fromUri(getBaseURL()).path(resource);
+        }
+
+        public byte[] getBuffer(String resourceUri, Map<String, Object[]> queryParams, Object... elements)
+            throws Exception
+        {
+            InputStream is = getInputStream(resourceUri, queryParams, elements);
+
+            byte[] buffer;
+            try {
+                buffer = IOUtils.toByteArray(is);
+            } finally {
+                is.close();
+            }
+
+            return buffer;
+        }
+
+        public <T> T getResource(String resourceUri, Map<String, Object[]> queryParams, Object... elements)
+            throws Exception
+        {
+            T resource;
+            try (InputStream is = getInputStream(resourceUri, queryParams, elements)) {
+                resource = (T) unmarshaller.unmarshal(is);
+            }
+
+            return resource;
+        }
     }
 }

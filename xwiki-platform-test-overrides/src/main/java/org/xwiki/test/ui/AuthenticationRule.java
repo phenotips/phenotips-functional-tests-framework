@@ -27,7 +27,6 @@ import org.openqa.selenium.WebDriver;
  *
  * @version $Id$
  * @since 5.1M1
- * @todo decide if we want this way of authenticating to replace {@link AbstractStandardUserAuthenticatedTest}
  */
 public class AuthenticationRule implements TestRule
 {
@@ -89,9 +88,13 @@ public class AuthenticationRule implements TestRule
 
     public void registerIfNeeded()
     {
-        if (!"superadmin".equals(this.userName) && !"XWikiGuest".equals(this.userName)
-            && !this.testUtils.pageExists("XWiki", this.userName)) {
-            this.testUtils.createUserAndLogin(this.userName, this.userPassword, this.parameters);
+        try {
+            if (!"superadmin".equals(this.userName) && !"XWikiGuest".equals(this.userName)
+                && !this.testUtils.pageExists("XWiki", this.userName)) {
+                this.testUtils.createUserAndLogin(this.userName, this.userPassword, this.parameters);
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
         }
     }
 }
