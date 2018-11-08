@@ -219,13 +219,15 @@ public class ImportMojo extends AbstractMojo
         // authors
         for (Developer developer : model.getDevelopers()) {
             URL authorURL = null;
-            if (developer.getUrl() != null) {
-                try {
+            try {
+                if (developer.getUrl() != null) {
                     authorURL = new URL(developer.getUrl());
-                } catch (MalformedURLException e) {
-                    this.getLog().warn(
-                        "Invalid URL for developer [" + developer.getId() + "]: [" + developer.getUrl() + "]");
+                } else {
+                    authorURL = new URL("https://phenotips.org/");
                 }
+            } catch (MalformedURLException e) {
+                this.getLog().warn(
+                    "Invalid URL for developer [" + developer.getId() + "]: [" + developer.getUrl() + "]");
             }
 
             extension.addAuthor(new DefaultExtensionAuthor(StringUtils.defaultIfBlank(developer.getName(),
