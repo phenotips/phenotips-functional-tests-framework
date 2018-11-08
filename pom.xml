@@ -27,7 +27,7 @@
   <packaging>pom</packaging>
 
   <prerequisites>
-    <maven>3.0</maven>
+    <maven>3.5</maven>
   </prerequisites>
 
   <name>PhenoTips - Functional testing framework</name>
@@ -124,10 +124,10 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <phenotips.version>1.4-milestone-3</phenotips.version>
-    <xwiki.version>7.4.6</xwiki.version>
-    <slf4j.version>1.7.22</slf4j.version>
-    <buildtools.version>1.7</buildtools.version>
+    <phenotips.version>1.4</phenotips.version>
+    <xwiki.version>10.8.1</xwiki.version>
+    <slf4j.version>1.7.25</slf4j.version>
+    <buildtools.version>1.9</buildtools.version>
   </properties>
 
   <build>
