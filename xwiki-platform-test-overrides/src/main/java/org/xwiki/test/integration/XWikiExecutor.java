@@ -21,11 +21,13 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecuteResultHandler;
 import org.apache.commons.exec.DefaultExecutor;
@@ -461,12 +463,12 @@ public class XWikiExecutor
     {
         PropertiesConfiguration properties = new PropertiesConfiguration();
 
-        FileInputStream fis;
+        FileReader fis;
         try {
-            fis = new FileInputStream(path);
+            fis = new FileReader(path);
 
             try {
-                properties.load(fis);
+                properties.read(fis);
             } finally {
                 fis.close();
             }
@@ -511,9 +513,9 @@ public class XWikiExecutor
 
     private void savePropertiesConfiguration(String path, PropertiesConfiguration properties) throws Exception
     {
-        FileOutputStream fos = new FileOutputStream(path);
+        FileWriter fos = new FileWriter(path);
         try {
-            properties.save(fos);
+            properties.write(fos);
         } finally {
             fos.close();
         }
