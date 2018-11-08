@@ -99,7 +99,7 @@ public class XWikiExecutor
 
     private String executionDirectory;
 
-    private Map<String, String> environment = new HashMap<String, String>();
+    private Map<String, String> environment = new HashMap<>();
 
     private DefaultExecuteResultHandler startedProcessHandler;
 
