@@ -23,7 +23,7 @@
   <parent>
     <groupId>org.phenotips</groupId>
     <artifactId>phenotips-testing-framework</artifactId>
-    <version>1.4</version>
+    <version>1.5-SNAPSHOT</version>
   </parent>
   <artifactId>phenotips-functional-tests-lifecycle</artifactId>
   <name>PhenoTips - Tools - Functional Tests Lifecycle</name>
